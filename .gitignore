@@ -8,12 +8,19 @@ ehthumbs.db
 Thumbs.db
 
 # Private student submissions & local CSVs (FERPA Protection)
-*.private.csv
+*.csv
+!sample_grades.csv
+!demo_sample_grades.csv
+*grades*
+*roster*
 *homework*
 *submission*
 *student*
-!sample_grades.csv
-!demo_sample_grades.csv
+
+# Archives & ZIPs
+*.zip
+*.tar.gz
+*.tgz
 
 # Logs & Temporary files
 *.log

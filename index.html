@@ -252,29 +252,30 @@
 <body>
 
   <header>
-    <div class="badge-bar">
-      <span class="badge">🚀 v1.0.0 Release</span>
-      <span class="badge">🔒 100% FERPA Compliant</span>
-      <span class="badge">⚖️ MIT Open Source</span>
-      <span class="badge">🎓 For Instructors & TAs</span>
-    </div>
-    <h1>Brightspace Feedback & Grade Assistant</h1>
-    <p class="subtitle">
-      A blazing-fast userscript for D2L Brightspace. Automatically injects grades and rich rubric feedback from CSV, auto-confirms dialogs, fast-skips already evaluated students, and guarantees <strong>100% class roster coverage</strong> with zero missed students.
-    </p>
-    <div class="cta-group">
-      <a href="https://raw.githubusercontent.com/quang-Ivan/brightspace-grade-assistant/main/brightspace_auto_feedback_injector.user.js" class="btn btn-install">
-        ⚡ 1-Click Install Userscript
-      </a>
-      <a href="https://github.com/quang-Ivan/brightspace-grade-assistant" class="btn btn-github">
-        ⭐ View on GitHub
-      </a>
-      <a href="https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/IN_DEPTH_GUIDE.md" class="btn btn-github">
-        📖 Technical Manual
-      </a>
-      <a href="sample_grades.csv" download class="btn btn-github">
-        📥 Download Sample CSV
-      </a>
+    <div class="container">
+      <div style="margin-bottom:16px;">
+        <span class="badge">🚀 v1.0.0 Release</span>
+        <span class="badge">🔒 100% Client-Side Privacy</span>
+        <span class="badge">⚖️ MIT Open Source</span>
+      </div>
+      <h1>Brightspace Feedback & Grade Assistant</h1>
+      <p class="subtitle">
+        Automate grade entry and rich feedback injection into D2L Brightspace. Zero-miss roster traversal, fast skip for existing grades, and complete gradebook synchronization.
+      </p>
+      <div class="hero-actions">
+        <a href="https://raw.githubusercontent.com/quang-Ivan/brightspace-grade-assistant/main/brightspace_auto_feedback_injector.user.js" class="btn btn-install">
+          ⚡ 1-Click Install Script (v1.0.0)
+        </a>
+        <a href="https://github.com/quang-Ivan/brightspace-grade-assistant" class="btn btn-github">
+          ⭐ View on GitHub
+        </a>
+        <a href="https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/IN_DEPTH_GUIDE.md" class="btn btn-github">
+          📖 Technical Manual
+        </a>
+        <a href="sample_grades.csv" download class="btn btn-github">
+          📥 Download Sample CSV
+        </a>
+      </div>
     </div>
   </header>
 
@@ -282,12 +283,11 @@
     <div class="container">
       <h2 style="text-align:center; font-size:2rem; margin-bottom:10px;">Why TAs & Instructors Love It</h2>
       <p style="text-align:center; color:var(--text-muted); max-width:680px; margin:0 auto;">
-        Grading 50–500 students manually on Brightspace takes 15–30 seconds per student. With this script, batch grading a full class takes under 2 minutes.
+        Grading each student manually on Brightspace takes 15–30 seconds. With automated cruise, each student evaluation draft is synchronized in ~3–4 seconds, reducing a 50-student section from ~25 minutes to ~3 minutes, while leaving you in full control to review before publishing.
       </p>
 
       <div class="grid-3">
         <div class="card">
-          <div class="card-icon">🔄</div>
           <h3>Zero-Miss Roster Coverage</h3>
           <p>
             Never worry about starting mid-list. When Auto-Cruise starts, it automatically rewinds backward to Student #1 before forward cruising, and wraps around at the end if any students remain unvisited.
@@ -320,9 +320,9 @@
 
         <div class="card">
           <div class="card-icon">🔒</div>
-          <h3>100% Privacy & FERPA Safe</h3>
+          <h3>Privacy-First Architecture</h3>
           <p>
-            Zero cloud backend, zero tracking, zero external network calls. All CSV data is read client-side and stored strictly in your browser origin local storage.
+            Zero cloud backend, zero telemetry, zero external network calls. All CSV data is read client-side and stored strictly in your browser origin local storage.
           </p>
         </div>
 
@@ -485,14 +485,14 @@
       <div class="faq-item">
         <div class="faq-question">Will students see feedback immediately?</div>
         <div class="faq-answer">
-          The script clicks "Save Draft" or "Update", meaning grades and feedback remain in draft mode until you choose to publish them all at once via Brightspace's "Publish All" button.
+          For new assignments, the script clicks "Save Draft", keeping grades hidden until you release them via Brightspace's official "Publish All" button. (Note: if an assignment was already published, clicking "Update" will update published grades).
         </div>
       </div>
 
       <div class="faq-item">
-        <div class="faq-question">Is student data protected under FERPA?</div>
+        <div class="faq-question">How is student privacy protected (FERPA / GDPR considerations)?</div>
         <div class="faq-answer">
-          Absolutely. The script has zero tracking, zero telemetries, and zero cloud backends. All grading data is processed locally inside your browser and stored in your browser's private origin-isolated storage.
+          The script has zero telemetry, zero analytics, and zero remote network calls. All grading data is processed locally inside your browser and stored in your browser origin storage scoped per assignment.
         </div>
       </div>
     </div>

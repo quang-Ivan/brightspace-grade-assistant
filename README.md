@@ -3,10 +3,10 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/Version-1.0.0-brightgreen.svg)](brightspace_auto_feedback_injector.user.js)
 [![Userscript](https://img.shields.io/badge/Userscript-Tampermonkey%20%7C%20Violentmonkey-green.svg)](brightspace_auto_feedback_injector.user.js)
-[![FERPA Compliant](https://img.shields.io/badge/FERPA-100%25%20Compliant-brightgreen.svg)](#-privacy--ferpa-compliance)
+[![Privacy: 100% Local](https://img.shields.io/badge/Privacy-100%25%20Local-brightgreen.svg)](#-privacy--local-execution)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-orange.svg)](CONTRIBUTING.md)
 
-> A blazing-fast client-side userscript for instructors, professors, and Teaching Assistants (TAs). Automatically injects grades and rich rubric feedback into **D2L Brightspace Consistent Evaluation**, auto-confirms dialogs, fast-skips already evaluated students, and cruises through the entire class roster with **100% class coverage**.
+> A blazing-fast client-side userscript for instructors, professors, and Teaching Assistants (TAs). Automatically injects grades and rich rubric feedback into **D2L Brightspace Consistent Evaluation**, auto-confirms navigation dialogs, fast-skips already evaluated students, and cruises through the entire class roster with **reconciled class coverage**.
 
 ---
 
@@ -21,8 +21,11 @@
 
 ### Step 1: Install a Userscript Manager (One-Time Setup)
 Install one of the recommended open-source browser extensions:
-- [**Violentmonkey**](https://violentmonkey.github.io/) (Recommended — fast, lightweight, and open source)
+- [**Violentmonkey**](https://violentmonkey.github.io/) (Recommended — fast, lightweight, and works seamlessly)
 - [**Tampermonkey**](https://www.tampermonkey.net/) (Popular alternative)
+
+> [!NOTE]
+> **Chrome 138+ / Tampermonkey 5.3+ Notice**: In Chromium-based browsers, ensure **"Developer mode"** is enabled in `chrome://extensions` or toggle on **"Allow User Scripts"** in the extension details page so userscripts are permitted to run. Violentmonkey handles this automatically.
 
 ### Step 2: Install This Userscript
 Click the 1-click install link below:
@@ -62,14 +65,14 @@ Click the 1-click install link below:
 
 ## 🌟 Features at a Glance
 
-- 🔄 **Zero-Miss Full Roster Traversal**: Auto-rewinds to Student #1 before forward cruising, and wraps around at the end if any students remain unvisited (up to 2 automatic rewind passes).
-- 🎯 **Deep Web Component Piercing**: Penetrates `d2l-input-number` and TinyMCE iframe editors inside Brightspace Web Components.
-- 📝 **True Event Synchronization**: Dispatches proper `@d2l-htmleditor-blur` events and triggers `_saveFeedback()` to guarantee rich HTML overall feedback is permanently persisted to the Brightspace server.
-- ⚡ **0.4s Fast Skip & Dialog Dismissal**: Already-graded students are skipped in 400ms (while actively verifying that overall feedback is non-empty). Unsaved changes dialogs are dynamically intercepted and dismissed in 100ms.
-- ⚠️ **Smart Skip for Unsubmitted Students**: Detects students without submissions or with blank scores, displays an alert in the UI, and smoothly proceeds to the next student without stalling.
-- 🛑 **Emergency Stop (<kbd>Alt</kbd> + <kbd>S</kbd>)**: Instantly halts all automation in real time.
-- 🎵 **Web Audio Completion Chime**: Synthesizes a pleasant 4-note chime (C5-E5-G5-C6) when all grading is finished.
-- 🔒 **100% FERPA & Privacy Compliant**: Zero student data is hosted, transmitted, or tracked. Everything runs strictly in your local browser origin.
+- 🔄 **Reconciled Full Roster Traversal**: Auto-rewinds to Student #1 before forward cruising, and wraps around if any students remain unvisited (up to 2 passes). Strictly reconciles completed vs. missing students before displaying completion.
+- 🎯 **Deep Web Component Piercing**: Targets `d2l-input-number` and TinyMCE iframe editors inside Brightspace Web Components while strictly isolating overall grades from rubric criteria.
+- 📝 **True Event Synchronization**: Dispatches proper `@d2l-htmleditor-blur` events to guarantee rich HTML overall feedback is permanently synchronized.
+- ⚡ **0.4s Fast Skip & Dialog Dismissal**: Already-graded students are skipped in 400ms (verifying non-empty feedback). Harmless navigation dialogs are safely intercepted; destructive dialogs (delete/discard) strictly halt for safety.
+- ⚠️ **Smart Skip & Validation**: Rejects invalid non-numeric scores, alerts on duplicate student names, and safely skips unsubmitted students.
+- 🛑 **Emergency Stop (<kbd>Alt</kbd> + <kbd>S</kbd>)**: Immediately cancels running tokens and invalidates all pending asynchronous promises in real time.
+- 🎵 **Web Audio Completion Chime**: Synthesizes a pleasant 4-note chime (C5-E5-G5-C6) when all grading is verified.
+- 🔒 **Privacy-First Local Architecture**: 100% client-side vanilla JavaScript. Zero telemetry, zero analytics, and no third-party network requests. Stored context is isolated per course and assignment.
 
 ---
 
@@ -189,8 +192,8 @@ The script automatically detects unsubmitted students (or empty scores in your C
 </details>
 
 <details>
-<summary><strong>Q: Is student data protected under FERPA / GDPR?</strong></summary>
-Absolutely. All CSV parsing occurs locally in memory via the HTML5 <code>FileReader</code> API. No analytics, no remote servers, and zero telemetry.
+<summary><strong>Q: How is student privacy protected (FERPA / GDPR considerations)?</strong></summary>
+The script runs 100% locally inside your browser session as client-side vanilla JavaScript. There are zero remote APIs, zero external CDNs, and zero analytics tracking. CSV parsing happens in memory via the HTML5 <code>FileReader</code> API. Local storage data is scoped strictly to the current course and assignment context, and can be completely purged at any time using the <strong>🔄 Reset Cache & CSV</strong> button.
 </details>
 
 ---

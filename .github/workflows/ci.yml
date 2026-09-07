@@ -22,7 +22,11 @@ jobs:
         run: |
           node -c brightspace_auto_feedback_injector.user.js
 
-      - name: Verify FERPA & Cleanliness (Zero PII / Zero Leaks)
+      - name: Run Regression Unit Tests (CSV, Escaping, Validation)
+        run: |
+          node tests/userscript_unit_test.js
+
+      - name: Verify Userscript Metadata Headers
         run: |
           node -e '
             const fs = require("fs");
