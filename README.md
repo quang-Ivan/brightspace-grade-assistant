@@ -121,11 +121,16 @@ Here are the three easiest ways to prepare your grade CSV:
 ### Workflow 1: From Brightspace Export (Zero Manual Typing of Names)
 If you want an exact list of all student names in your course without typing them:
 1. In Brightspace, navigate to **Grades** ➔ **Enter Grades** ➔ **Export**.
-2. Under **Key Field**, select `Both` or `OrgDefinedId`.
+2. Under **Key Field**, **ensure you select `OrgDefinedId`** (or `Both`).
 3. Under **User Details**, check `Last Name` and `First Name`.
 4. Under **Choose Grades to Export**, check your target Assignment (e.g. `Homework 1`).
 5. Click **Export to CSV**.
 6. Open the downloaded file in Microsoft Excel or Google Sheets, fill in the scores and comments, and click **Save as CSV**.
+
+> [!IMPORTANT]
+> **Why `OrgDefinedId` is strongly recommended**:
+> - **Unique Student Identification**: Prevents ambiguity if two students share similar or identical names.
+> - **Gradebook Re-Import Compatibility**: Brightspace's native Gradebook Import feature (`Grades ➔ Import`) **strictly requires** the `OrgDefinedId` column (with `#` prefix). Keeping this column allows you to reuse this same CSV file for Brightspace's official gradebook import whenever needed!
 
 ---
 
