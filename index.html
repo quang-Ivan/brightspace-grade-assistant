@@ -405,13 +405,23 @@
     <div class="container" style="padding-top:0;">
       <h2 style="font-size:1.8rem; margin-bottom:16px;">Supported CSV Formats</h2>
       <p style="color:var(--text-muted); margin-bottom:16px;">
-        You can upload standard 3-column spreadsheets or Brightspace official gradebook exports:
+        Both formats can inject scores and overall feedback. Pick the one that fits your workflow:
       </p>
 
+      <h3 style="font-size:1.2rem; margin-bottom:8px; color:var(--dark);">Format A: Simple 3-Column CSV (Recommended for Scores + Feedback)</h3>
       <pre><code>student,score,reason
 "Alice Smith",100.0,"Outstanding work! All problems completed accurately with clear units."
 "Bob Jones",88.5,"Good submission. Remember to include physical units on Problem 2."
 "Charlie Brown",,"No submission"</code></pre>
+
+      <h3 style="font-size:1.2rem; margin-top:24px; margin-bottom:8px; color:var(--dark);">Format B: Brightspace Export (With Optional Feedback Column)</h3>
+      <p style="color:var(--text-muted); font-size:14px; margin-bottom:8px;">
+        If you exported your roster from Brightspace, you can add a <code>Feedback</code> column to inject both scores and feedback simultaneously:
+      </p>
+      <pre><code>OrgDefinedId,Last Name,First Name,Homework 1 Points Grade &lt;Numeric MaxPoints:100&gt;,Feedback,End-of-Line Indicator
+#112233445,Smith,Alice,95.0,"Excellent work! All answers completely correct.",#
+#112233446,Jones,Bob,88.5,"Good job. Note: check units on problem 2.",#
+#112233447,Brown,Charlie,,No submission,#</code></pre>
 
       <h2 style="font-size:1.8rem; margin-top:50px; margin-bottom:16px;">Keyboard Shortcuts</h2>
       <table>

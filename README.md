@@ -81,9 +81,18 @@ Doing both simultaneously inside Brightspace is agonizingly slow. **Brightspace 
 
 ## 📋 CSV Format Specification
 
-The userscript natively understands both simple custom spreadsheets and official Brightspace exports. A starter template is provided in [`sample_grades.csv`](sample_grades.csv).
+### 🎯 Which Format Should You Choose?
 
-### Format A: Simple 3-Column CSV (Recommended)
+| Goal | Recommended Format | Score Filled? | Feedback Injected? |
+| :--- | :---: | :---: | :---: |
+| **Inject Both Scores & Detailed Feedback** (Simplest) | **Format A** (`student,score,reason`) | ✅ Yes | ✅ Yes (Built-in `reason` column) |
+| **Export Roster from Brightspace, then add Feedback** | **Format B with `Feedback` column** | ✅ Yes | ✅ Yes (Add a `Feedback` column) |
+| **Only Fill Numeric Scores** (No feedback needed) | **Format B Native** (Standard Brightspace export) | ✅ Yes | ⏹️ No (Score only) |
+
+---
+
+### Format A: Simple 3-Column CSV (Recommended for Scores + Feedback)
+The simplest, most popular format for instructors and TAs:
 ```csv
 student,score,reason
 "Alice Smith",95.0,"Excellent work! Problem 1 and Problem 2 are completely correct."
@@ -95,22 +104,38 @@ student,score,reason
 #### Column Rules:
 | Column | Required | Description | Examples |
 | :--- | :---: | :--- | :--- |
-| **`student`** | **Yes** | Full student name. Matches the student name displayed on Brightspace. Supports `First Last` or `Last, First`. | `"Alice Smith"`, `"Smith, Alice"` |
+| **`student`** | **Yes** | Full student name matching Brightspace. Supports `First Last` or `Last, First`. | `"Alice Smith"`, `"Smith, Alice"` |
 | **`score`** | **Yes** | Numeric grade points. **For unsubmitted students, leave this completely blank!** | `95`, `95.0`, `8.0`, `""` *(blank)* |
-| **`reason`** | Optional | Overall feedback comments. Supports plain text, multiple lines (wrapped in double quotes), or formatted HTML. | `"Great work!"`, `"<p>Good job</p>"` |
+| **`reason`** | Optional | Overall feedback comments. Supports plain text, multiple lines (wrapped in quotes), or HTML tags. | `"Great work!"`, `"<p>Good job</p>"` |
 
 > [!TIP]
 > **Handling Unsubmitted Students**: Simply leave the `score` column blank (e.g. `"Charlie Brown",,"No submission"`). The script will automatically detect the absence of a grade, mark the student as `⚠️ [Unsubmitted]`, and smoothly advance to the next student without stalling!
 
-### Format B: Brightspace Official Gradebook Export Format
-If you already exported your course roster from Brightspace, you can use that file directly:
+---
+
+### Format B: Brightspace Export Format (Supports Both Score & Feedback!)
+
+Brightspace's official Gradebook Export by default only contains numeric points columns. **However, both scores and feedback CAN be provided in Format B!**
+
+#### Option B1: With Feedback (Add a `Feedback` Column)
+Simply insert a column titled `Feedback` (or `Comments` / `Reason`) into your exported spreadsheet:
+```csv
+OrgDefinedId,Last Name,First Name,Homework 1 Points Grade <Numeric MaxPoints:100>,Feedback,End-of-Line Indicator
+#112233445,Smith,Alice,95.0,"Excellent work! All answers completely correct.",#
+#112233446,Jones,Bob,88.5,"Good job. Note: check units on problem 2.",#
+#112233447,Brown,Charlie,,No submission,#
+```
+> The script automatically detects the `Feedback` / `Comments` / `Reason` column and injects it into Brightspace's rich-text feedback editor!
+
+#### Option B2: Score Only (Native Brightspace Export as-is)
+If you only want to auto-fill numeric grades and don't need overall feedback:
 ```csv
 OrgDefinedId,Last Name,First Name,Homework 1 Points Grade <Numeric MaxPoints:100>,End-of-Line Indicator
 #112233445,Smith,Alice,95.0,#
 #112233446,Jones,Bob,88.5,#
 #112233447,Brown,Charlie,,#
 ```
-The script will automatically detect `First Name` + `Last Name` and extract the points column!
+The script will automatically detect `First Name` + `Last Name`, fill the score, and leave the feedback field untouched.
 
 ---
 
