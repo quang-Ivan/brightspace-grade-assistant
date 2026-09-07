@@ -137,20 +137,35 @@
         } catch(e) {}
     }
 
-    function findStudentData(studentName, db) {
-        if (!studentName || !db) return null;
+    function findStudentData(studentName, db, studentOrgId = null) {
+        if (!db) return null;
+
+        // 1. Primary Key: Prioritize OrgDefinedId if present on page
+        if (studentOrgId) {
+            const cleanOrgId = String(studentOrgId).trim().toLowerCase();
+            for (const [key, val] of Object.entries(db)) {
+                if (val && val.orgId && String(val.orgId).trim().toLowerCase() === cleanOrgId) {
+                    console.log(`[D2L-AutoFeedback] Authoritatively matched student by OrgDefinedId "${studentOrgId}":`, key);
+                    return val;
+                }
+            }
+        }
+
+        // 2. Secondary: Fall back to student name
+        if (!studentName) return null;
         if (db[studentName]) return db[studentName];
         
         const clean = studentName.trim().toLowerCase();
         const matches = [];
         for (const [key, val] of Object.entries(db)) {
-            if (key.trim().toLowerCase() === clean) {
+            const candidateName = (val && val.name) ? val.name : key;
+            if (candidateName.trim().toLowerCase() === clean || key.trim().toLowerCase() === clean) {
                 matches.push({ name: key, data: val });
                 continue;
             }
             
             // Handle "First Last" vs "Last, First"
-            const parts = key.split(/[\s,]+/).filter(Boolean);
+            const parts = candidateName.split(/[\s,]+/).filter(Boolean);
             if (parts.length === 2) {
                 const rev = `${parts[1]} ${parts[0]}`.toLowerCase();
                 if (rev === clean) {
@@ -246,6 +261,25 @@
         }
 
         // Strictly do NOT perform whole-page body fallback to prevent false matches
+        return null;
+    }
+
+    function getStudentOrgIdFromPage() {
+        // 1. Check data attributes in Consistent Evaluation
+        const idElements = deepQuery('[data-org-defined-id], [data-orgdefinedid], [data-user-id], [data-emplid]');
+        for (const el of idElements) {
+            const id = el.getAttribute('data-org-defined-id') || el.getAttribute('data-orgdefinedid') || el.getAttribute('data-emplid') || el.getAttribute('data-user-id');
+            if (id && id.trim()) return id.trim();
+        }
+
+        // 2. Search Consistent Evaluation header or user details card for "Org Defined ID: xxx" or "ID: xxx"
+        const headerEls = deepQuery('d2l-consistent-evaluation-header, .d2l-consistent-evaluation-user-details, [class*="user-details" i]');
+        for (const h of headerEls) {
+            const txt = h.textContent || '';
+            const m = txt.match(/(?:Org\s*Defined\s*ID|Student\s*ID|EmplID)\s*[:#]?\s*([A-Za-z0-9_-]+)/i);
+            if (m && m[1]) return m[1].trim();
+        }
+
         return null;
     }
 
@@ -621,7 +655,7 @@
             return false;
         }
 
-        const data = findStudentData(student, db);
+        const data = findStudentData(student, db, getStudentOrgIdFromPage());
         if (!data) {
             if (statusEl && showNotification) {
                 statusEl.textContent = `⚠️ Student ${student} not found in CSV database`;
@@ -752,7 +786,7 @@
             return;
         }
 
-        const data = findStudentData(student, db);
+        const data = findStudentData(student, db, getStudentOrgIdFromPage());
 
         // Ambiguity check MUST COME FIRST: Halt immediately if multiple students match page name
         if (data && data.ambiguous) {
@@ -902,7 +936,7 @@
     function copyCurrentFeedback() {
         const student = getStudentNameFromPage();
         const db = getStudentDatabase();
-        const data = findStudentData(student, db);
+        const data = findStudentData(student, db, getStudentOrgIdFromPage());
         if (student && data && data.reason) {
             navigator.clipboard.writeText(data.reason).then(() => {
                 setStatus(`📋 Copied feedback for ${student} to clipboard!`, '#006fbf');
@@ -1356,7 +1390,7 @@
             if (!stuEl || !prevEl) return;
 
             if (student) {
-                const data = findStudentData(student, db);
+                const data = findStudentData(student, db, getStudentOrgIdFromPage());
                 if (data) {
                     if (data.submitted === false || data.score === null || data.score === '') {
                         stuEl.textContent = `${student} (Unsubmitted - Auto skip)`;

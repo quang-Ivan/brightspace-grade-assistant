@@ -100,6 +100,9 @@ student,score,reason
 - **`score`**: Numeric points. **For unsubmitted students, leave this completely blank!**
 - **`reason`**: Multi-line feedback comments or HTML tags.
 
+> [!TIP]
+> **For best reliability, add an `OrgDefinedId` column to Format A** (e.g. `student,OrgDefinedId,score,reason`). When present, the script matches students by ID first, avoiding any name ambiguity.
+
 ---
 
 ### Format B: Brightspace Roster Export Format
@@ -113,11 +116,15 @@ OrgDefinedId,Last Name,First Name,Homework 1 Points Grade <Numeric MaxPoints:100
 #112233447,Brown,Charlie,,No submission,#
 ```
 
+> [!IMPORTANT]
+> **Strongly Recommended: Include `OrgDefinedId` in your CSV.**
+> - When `OrgDefinedId` is present in the CSV, the script uses it as the **primary key** for student matching, completely eliminating name ambiguity issues (e.g. two students with the same first and last name).
+> - If `OrgDefinedId` is not available or not found on the evaluation page, the script falls back to matching by `First Name` + `Last Name` as displayed in Brightspace.
+
 > [!WARNING]
 > **Format B with `Feedback` is a Userscript-Specific Format**:
 > - Adding a `Feedback` column is designed specifically for **this userscript**.
 > - Do **NOT** upload a CSV with a `Feedback` column directly to Brightspace's native `Grades ➔ Import` tool, because Brightspace's backend only accepts numeric grade item columns and will reject unknown text columns.
-> - **Student Matching Note**: On the Consistent Evaluation page, Brightspace displays students by `First Name` + `Last Name`. Our userscript matches students on screen using their names, while preserving `OrgDefinedId` for auditing and data integrity.
 
 ---
 
