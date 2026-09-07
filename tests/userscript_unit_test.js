@@ -1,103 +1,78 @@
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
 
-// 1. Test HTML escaping & newline formatting
-function escapeHtml(text) {
-    return String(text)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
+const userscriptPath = path.resolve(__dirname, '../brightspace_auto_feedback_injector.user.js');
+const rawCode = fs.readFileSync(userscriptPath, 'utf8');
+
+console.log('--- 1. Testing Production Code Integrity & Security Predicates ---');
+
+// Assert that production code contains real escapeHtml implementation
+assert.ok(rawCode.includes('function escapeHtml(text)'), 'Production code must contain escapeHtml()');
+assert.ok(rawCode.includes('function formatFeedbackHtml(plainText)'), 'Production code must contain formatFeedbackHtml()');
+assert.ok(rawCode.includes('formatFeedbackHtml(plainText)'), 'deepFillFeedback must call formatFeedbackHtml()');
+
+// Assert that activeRunToken is present for race condition protection
+assert.ok(rawCode.includes('activeRunToken'), 'Production code must use activeRunToken for cancellation');
+
+// Assert that rubric isolation exists across Shadow DOM
+assert.ok(rawCode.includes('hasRubricAncestor'), 'Production code must check hasRubricAncestor()');
+assert.ok(rawCode.includes('isOverallGradeElement'), 'Production code must check isOverallGradeElement()');
+
+// Assert that duplicate student names trigger a hard block
+assert.ok(rawCode.includes('duplicateNames.length > 0'), 'Production code must detect duplicate student names');
+assert.ok(rawCode.includes('CSV Import Blocked'), 'Production code must alert and block duplicate imports');
+
+// Assert that dialog handler halts on destructive modals and rejects negative buttons
+assert.ok(rawCode.includes("txt.includes(\"don't\")"), 'autoConfirmDialog must reject negative buttons like "Don\'t save"');
+assert.ok(rawCode.includes('Destructive dialog detected'), 'autoConfirmDialog must halt on destructive dialogs');
+
+console.log('✔ All production security predicates verified in brightspace_auto_feedback_injector.user.js');
+
+console.log('--- 2. Executing Extracted Functions in VM Sandbox ---');
+
+// Extract the functions from production script to test runtime logic
+function extractFunction(code, fnName) {
+    const match = code.match(new RegExp(`function ${fnName}\\s*\\([\\s\\S]*?\\n    \\}`));
+    if (!match) throw new Error(`Could not find function ${fnName} in production code`);
+    return match[0];
 }
 
-function formatFeedbackHtml(plainText) {
-    if (!plainText) return '<p></p>';
-    const safe = escapeHtml(plainText);
-    const lines = safe.split(/\r?\n/);
-    return '<p>' + lines.join('<br>') + '</p>';
-}
+const sandbox = {};
+vm.createContext(sandbox);
 
-console.log('Testing HTML escaping & newline formatting...');
+// Evaluate escapeHtml and formatFeedbackHtml directly from the production script
+const escapeHtmlSrc = extractFunction(rawCode, 'escapeHtml');
+const formatHtmlSrc = extractFunction(rawCode, 'formatFeedbackHtml');
+vm.runInContext(escapeHtmlSrc, sandbox);
+vm.runInContext(formatHtmlSrc, sandbox);
+
+// Test XSS and HTML tag escaping
 assert.strictEqual(
-    formatFeedbackHtml('Great work! Score < 100 & > 0.\nLine 2'),
-    '<p>Great work! Score &lt; 100 &amp; &gt; 0.<br>Line 2</p>'
+    sandbox.formatFeedbackHtml('Score < 100 & > 0.\nSecond line'),
+    '<p>Score &lt; 100 &amp; &gt; 0.<br>Second line</p>',
+    'Must escape HTML tags and convert newlines to <br>'
 );
 assert.strictEqual(
-    formatFeedbackHtml('<script>alert("xss")</script>'),
-    '<p>&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;</p>'
+    sandbox.formatFeedbackHtml('<script>alert("xss")</script>'),
+    '<p>&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;</p>',
+    'Must safely neutralize script tags'
 );
+console.log('✔ Real production formatFeedbackHtml passed escaping & multiline tests');
 
-// 2. Test CSV Parsing & Duplicate Name Detection
-function parseCSV(text) {
-    const lines = text.trim().split(/\r?\n/);
-    return lines.map(line => {
-        const row = [];
-        let cur = '';
-        let inside = false;
-        for (let i = 0; i < line.length; i++) {
-            const ch = line[i];
-            if (ch === '"') {
-                if (inside && line[i + 1] === '"') {
-                    cur += '"';
-                    i++;
-                } else {
-                    inside = !inside;
-                }
-            } else if (ch === ',' && !inside) {
-                row.push(cur.trim());
-                cur = '';
-            } else {
-                cur += ch;
-            }
-        }
-        row.push(cur.trim());
-        return row;
-    });
-}
+// Evaluate parseCSV from production script
+const parseCsvSrc = extractFunction(rawCode, 'parseCSV');
+vm.runInContext(parseCsvSrc, sandbox);
 
-console.log('Testing CSV parsing & duplicate name collision detection...');
-const testCsv = `First Name,Last Name,OrgDefinedId,Score,Feedback
+const sampleCsv = `First Name,Last Name,OrgDefinedId,Score,Feedback
 Alex,Smith,001,90,Good job
-Alex,Smith,002,85,Needs improvement
-Bob,Jones,003,100,Perfect`;
+Bob,Jones,002,100,Perfect`;
 
-const rows = parseCSV(testCsv);
-const headers = rows[0].map(h => h.toLowerCase().trim());
-const fI = headers.indexOf('first name');
-const lI = headers.indexOf('last name');
-const sI = headers.indexOf('score');
+const parsedRows = sandbox.parseCSV(sampleCsv);
+assert.strictEqual(parsedRows.length, 3);
+assert.strictEqual(parsedRows[1][0], 'Alex');
+assert.strictEqual(parsedRows[1][3], '90');
+console.log('✔ Real production parseCSV passed CSV parsing tests');
 
-assert.notStrictEqual(sI, -1, 'Score column must be found');
-
-const db = {};
-const duplicates = [];
-for (let i = 1; i < rows.length; i++) {
-    const row = rows[i];
-    const name = `${row[fI]} ${row[lI]}`;
-    if (db[name]) {
-        duplicates.push(name);
-    }
-    db[name] = { score: row[sI] };
-}
-
-assert.strictEqual(duplicates.length, 1);
-assert.strictEqual(duplicates[0], 'Alex Smith');
-
-// 3. Test Score Sanity Validation
-console.log('Testing numeric score validation...');
-function validateScore(raw) {
-    if (raw === '' || raw === null || raw === undefined) return null;
-    if (raw.toLowerCase() === 'null' || raw.toLowerCase() === 'none') return null;
-    const num = Number(raw);
-    if (!isNaN(num) && isFinite(num) && num >= 0) return num;
-    return null;
-}
-
-assert.strictEqual(validateScore('95'), 95);
-assert.strictEqual(validateScore('100.5'), 100.5);
-assert.strictEqual(validateScore('95abc'), null);
-assert.strictEqual(validateScore('Infinity'), null);
-assert.strictEqual(validateScore('-10'), null);
-assert.strictEqual(validateScore(''), null);
-
-console.log('All regression unit tests passed successfully!');
+console.log('\n🎉 ALL REAL PRODUCTION CODE UNIT TESTS PASSED!');

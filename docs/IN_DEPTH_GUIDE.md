@@ -137,13 +137,12 @@ if (tiny && ed._editorId) {
 // 2. Dispatch the exact blur event that Brightspace expects
 ed.dispatchEvent(new CustomEvent('d2l-htmleditor-blur', { bubbles: true, composed: true }));
 
-// 3. Direct component state update and save invocation
+// 3. Direct component state update without unverified background writes
 fbPanels.forEach(fb => {
     fb._feedbackText = html;
-    if (typeof fb._saveFeedback === 'function') fb._saveFeedback();
 });
 ```
-This guarantees that overall feedback is permanently stored in the Brightspace database upon page reload.
+Draft persistence is then initiated explicitly by triggering Brightspace's native "Save Draft" action with cancellation token gating.
 
 ---
 

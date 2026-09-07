@@ -7,15 +7,17 @@
 ehthumbs.db
 Thumbs.db
 
-# Private student submissions & local CSVs (FERPA Protection)
+# Private student submissions & local CSVs (Data Protection)
 *.csv
-!sample_grades.csv
-!demo_sample_grades.csv
 *grades*
 *roster*
 *homework*
 *submission*
 *student*
+
+# Sample file exemptions (MUST follow broad wildcard patterns)
+!sample_grades.csv
+!demo_sample_grades.csv
 
 # Archives & ZIPs
 *.zip

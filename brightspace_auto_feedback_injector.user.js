@@ -2,11 +2,11 @@
 // @name         Brightspace (D2L) Assignment Feedback & Grade Auto-Filler
 // @namespace    https://github.com/quang-Ivan/brightspace-grade-assistant
 // @version      1.0.0
-// @description  Deep Shadow-DOM & TinyMCE Piercer for D2L Brightspace. Auto-rewinds to roster start, fills grades and rich feedback, syncs true blur/Siren events, fast skips graded students, dismisses dialogs, and auto-navigates. 100% FERPA Compliant.
+// @description  Deep Shadow-DOM & TinyMCE Piercer for D2L Brightspace. Auto-rewinds to roster start, fills grades and rich feedback, syncs true blur/Siren events, fast skips graded students, dismisses dialogs, and auto-navigates. 100% client-side local execution.
 // @author       quang-Ivan
 // @license      MIT
-// @homepageURL  https://github.com/ivan/brightspace-grade-assistant
-// @supportURL   https://github.com/ivan/brightspace-grade-assistant/issues
+// @homepageURL  https://github.com/quang-Ivan/brightspace-grade-assistant
+// @supportURL   https://github.com/quang-Ivan/brightspace-grade-assistant/issues
 // @match        *://*/d2l/*
 // @match        *://*/*activities/iterator/*
 // @match        *://*/d2l/lms/dropbox/admin/mark/*
@@ -311,76 +311,93 @@
         return scoreMatches && hasUpdateBtn;
     }
 
+    function getComposedParent(node) {
+        if (!node) return null;
+        return node.parentElement || (node.parentNode instanceof ShadowRoot ? node.parentNode.host : null);
+    }
+
+    function hasRubricAncestor(el) {
+        let cur = el;
+        while (cur) {
+            const tag = (cur.tagName || '').toLowerCase();
+            const cls = (cur.className || '');
+            if (tag.includes('rubric') || (typeof cls === 'string' && cls.toLowerCase().includes('rubric'))) {
+                return true;
+            }
+            cur = getComposedParent(cur);
+        }
+        return false;
+    }
+
     function isOverallGradeElement(el) {
         if (!el) return false;
-        if (el.closest && (el.closest('d2l-rubric') || el.closest('[class*="rubric" i]'))) return false;
+        if (hasRubricAncestor(el)) return false;
         if (el.id === 'd2l-grade') return true;
         const label = (el.getAttribute('label') || el.getAttribute('aria-label') || '').toLowerCase();
         if (label.includes('rubric') || label.includes('criterion')) return false;
         if (label.includes('overall grade') || label.includes('overall score') || label === 'grade' || label === 'score') return true;
-        if (el.closest && (el.closest('d2l-consistent-evaluation-right-panel-grade') || el.closest('d2l-consistent-evaluation-right-panel-evaluation'))) return true;
+        const parent = getComposedParent(el);
+        if (parent && (parent.tagName || '').toLowerCase().includes('grade')) return true;
         return false;
     }
+
 
     function deepFillScore(scoreVal) {
         if (scoreVal === null || scoreVal === undefined || scoreVal === '') return false;
 
-        // Strictly target overall grade inputs and exclude rubric criteria
         const allCandidates = deepQuery('#d2l-grade, d2l-input-number#d2l-grade, d2l-input-number');
         const gradeEls = allCandidates.filter(isOverallGradeElement);
-        if (gradeEls.length === 0 && allCandidates.length > 0) {
-            // Safe fallback only if non-rubric
-            for (const el of allCandidates) {
-                if (!el.closest || (!el.closest('d2l-rubric') && !el.closest('[class*="rubric" i]'))) {
-                    gradeEls.push(el);
-                    break;
-                }
-            }
+
+        if (gradeEls.length === 0) {
+            console.warn('[D2L-AutoFeedback] Overall grade element not found.');
+            return false;
         }
-        let matchedCount = 0;
+        if (gradeEls.length > 1) {
+            console.error('[D2L-AutoFeedback] Ambiguous overall grade elements: multiple candidates found. Pausing.');
+            return false;
+        }
 
-        for (const gc of gradeEls) {
-            try { gc.value = parseFloat(scoreVal); } catch(e) {}
+        const gc = gradeEls[0];
+        try { gc.value = parseFloat(scoreVal); } catch(e) {}
 
-            const innerInputs = deepQuery('input', gc);
-            for (const inp of innerInputs) {
-                try {
-                    inp.focus();
-                    inp.value = scoreVal;
-                    inp.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-                    inp.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-                    inp.blur();
-                    matchedCount++;
-                } catch(e) {}
-            }
-
+        const innerInputs = deepQuery('input', gc);
+        for (const inp of innerInputs) {
             try {
-                gc.dispatchEvent(new CustomEvent('change', { bubbles: true, composed: true }));
-                matchedCount++;
+                inp.focus();
+                inp.value = scoreVal;
+                inp.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+                inp.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+                inp.blur();
             } catch(e) {}
         }
 
-        if (matchedCount === 0) {
-            const fallbackInputs = deepQuery('input[class*="d2l-input" i], input[id*="score" i], input[aria-label*="score" i]');
-            for (const inp of fallbackInputs) {
-                try {
-                    inp.focus();
-                    inp.value = scoreVal;
-                    inp.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-                    inp.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-                    inp.blur();
-                    matchedCount++;
-                } catch(e) {}
-            }
-        }
+        try {
+            gc.dispatchEvent(new CustomEvent('change', { bubbles: true, composed: true }));
+        } catch(e) {}
 
-        return matchedCount > 0;
+        return true;
     }
 
     // Complete Siren & Blur Event synchronized feedback injection
+    function escapeHtml(text) {
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function formatFeedbackHtml(plainText) {
+        if (!plainText) return '<p></p>';
+        const safe = escapeHtml(plainText);
+        const lines = safe.split(/\r?\n/);
+        return '<p>' + lines.join('<br>') + '</p>';
+    }
+
     function deepFillFeedback(plainText) {
         if (!plainText) return false;
-        const html = '<p>' + plainText.replace(/\\n/g, '<br>') + '</p>';
+        const html = formatFeedbackHtml(plainText);
         let filled = false;
 
         const win = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
@@ -460,17 +477,20 @@
     function triggerSave() {
         const candidates = deepQuery('d2l-button, button, [role="button"]');
         for (const b of candidates) {
+            if (b.disabled || b.hasAttribute('disabled')) continue;
             const txt = (b.getAttribute('text') || b.textContent || '').trim().toLowerCase();
             const aria = (b.getAttribute('aria-label') || '').toLowerCase();
-            if (
-                txt === 'save draft' || txt === 'update' || txt === 'save' ||
-                txt.includes('save draft') || txt.includes('update') ||
-                aria.includes('save draft') || aria.includes('update')
-            ) {
-                console.log('[D2L-AutoFeedback] Triggering Save/Update:', b);
+            
+            // Strictly require 'save draft' - do NOT accept 'update' or generic 'save'
+            const isSaveDraft = txt === 'save draft' || aria === 'save draft' || txt.includes('save draft') || aria.includes('save draft');
+            if (isSaveDraft) {
+                console.log('[D2L-AutoFeedback] Triggering Save Draft on element:', b);
                 if (b.shadowRoot) {
                     const inner = b.shadowRoot.querySelector('button');
-                    if (inner) inner.click();
+                    if (inner && !inner.disabled) {
+                        inner.click();
+                        return true;
+                    }
                 }
                 b.click();
                 return true;
@@ -481,63 +501,52 @@
 
     function autoConfirmDialog() {
         const dialogs = deepQuery('d2l-dialog-confirm, d2l-dialog, [role="alertdialog"], [role="dialog"], .d2l-dialog');
-        let confirmed = 0;
-
         for (const d of dialogs) {
             const isOpen = d.opened || d.hasAttribute('opened') || (d.style && d.style.display !== 'none' && d.offsetWidth > 0);
             if (!isOpen) continue;
 
-            console.log('[D2L-AutoFeedback] Active Dialog Detected, auto-confirming:', d);
-
-            try {
-                if (typeof d._close === 'function') d._close('yes');
-                else if (typeof d.close === 'function') d.close('yes');
-            } catch(e) {}
-
-            try {
-                d.dispatchEvent(new CustomEvent('d2l-dialog-close', {
-                    bubbles: true,
-                    composed: true,
-                    detail: { action: 'yes' }
-                }));
-            } catch(e) {}
-
-            const btns = deepQuery('button, d2l-button', d);
             const dialogText = (d.textContent || '').toLowerCase();
-            // Block destructive dialogs (delete/remove/discard)
+            
+            // 1. Immediately halt on destructive keywords with ZERO side-effects
             if (dialogText.includes('delete') || dialogText.includes('remove') || dialogText.includes('discard') || dialogText.includes('erase')) {
-                console.warn('[D2L-AutoFeedback] Destructive dialog detected! Halting automation for instructor safety:', dialogText);
-                stopCruise('⚠️ Potentially destructive dialog detected! Paused for manual review.', '#dc3545');
+                console.warn('[D2L-AutoFeedback] Destructive dialog detected! Halting automation with zero side effects:', dialogText);
+                stopCruise('⚠️ Destructive dialog detected. Halting automation for safety.', '#dc3545');
                 return false;
             }
 
-            // Whitelist safe navigation confirmation dialogs
-            const isSafeNav = dialogText.includes('unsaved') || dialogText.includes('save draft') || dialogText.includes('leave') || dialogText.includes('continue');
-            if (!isSafeNav && !d.getAttribute('data-safe-d2l')) {
-                console.warn('[D2L-AutoFeedback] Unrecognized dialog detected. Pausing auto-cruise.');
-                stopCruise('⚠️ Unrecognized confirmation dialog appeared. Please confirm manually.', '#f0ad4e');
+            // 2. Only allow safe navigation confirmation
+            const isSafeNav = dialogText.includes('unsaved') || dialogText.includes('save draft') || dialogText.includes('leave');
+            if (!isSafeNav) {
+                console.warn('[D2L-AutoFeedback] Unrecognized dialog detected. Halting automation.');
+                stopCruise('⚠️ Unrecognized confirmation dialog appeared. Paused for review.', '#f0ad4e');
                 return false;
             }
 
+            // 3. Find buttons: strictly reject "don't save" or cancellation
+            const btns = deepQuery('button, d2l-button', d);
             for (const b of btns) {
+                if (b.disabled || b.hasAttribute('disabled')) continue;
                 const act = (b.getAttribute('data-dialog-action') || b.getAttribute('dialog-action') || '').toLowerCase();
                 const txt = (b.getAttribute('text') || b.textContent || '').trim().toLowerCase();
 
-                if (act === 'yes' || act === 'save' || act.includes('save') || act === 'proceed' || txt === 'yes' || txt.includes('save draft') || txt.includes('save')) {
-                    console.log('[D2L-AutoFeedback] Clicking safe navigation dialog button:', b);
+                if (txt.includes("don't") || txt.includes('dont') || txt.includes('cancel') || txt === 'no' || act === 'no' || act === 'cancel') {
+                    continue;
+                }
+
+                if (act === 'yes' || act === 'save' || txt === 'save' || txt === 'save draft' || txt === 'yes' || act === 'proceed' || txt === 'proceed') {
+                    console.log('[D2L-AutoFeedback] Clicking safe navigation button:', b);
                     if (b.shadowRoot) {
                         const inner = b.shadowRoot.querySelector('button');
-                        if (inner) inner.click();
+                        if (inner && !inner.disabled) inner.click();
+                        else b.click();
+                    } else {
+                        b.click();
                     }
-                    b.click();
-                    confirmed++;
-                    break;
+                    return true;
                 }
             }
-
-            try { d.opened = false; } catch(e) {}
         }
-        return confirmed > 0;
+        return false;
     }
 
     function deepClickNext() {
@@ -612,19 +621,27 @@
         }
 
         const data = findStudentData(student, db);
-        if (!data || data.score === null || data.score === undefined || data.submitted === false) {
-            const msg = `⚠️ Student ${student} has no submission; skipping grading`;
+        if (!data) {
             if (statusEl && showNotification) {
-                statusEl.textContent = msg;
+                statusEl.textContent = `⚠️ Student ${student} not found in CSV database`;
                 statusEl.style.color = '#f0ad4e';
             }
             return false;
         }
 
         if (data.ambiguous) {
-            const msg = `⚠️ Ambiguous name: multiple CSV records match ${student}. Pausing for safety.`;
+            const msg = `⚠️ Ambiguous student name: multiple records match ${student}. Paused for safety.`;
             if (statusEl) { statusEl.textContent = msg; statusEl.style.color = '#dc3545'; }
             stopCruise(msg, '#dc3545');
+            return false;
+        }
+
+        if (data.score === null || data.score === undefined || data.submitted === false) {
+            const msg = `⚠️ Student ${student} has no submission; skipping grading`;
+            if (statusEl && showNotification) {
+                statusEl.textContent = msg;
+                statusEl.style.color = '#f0ad4e';
+            }
             return false;
         }
 
@@ -723,8 +740,8 @@
         await sleep(300);
     }
 
-    async function cruiseStep() {
-        if (isHalted || !autoCruiseActive || isProcessingCurrent) return;
+    async function cruiseStep(token) {
+        if (token !== activeRunToken || isHalted || !autoCruiseActive || isProcessingCurrent) return;
 
         const db = getStudentDatabase();
         const student = getStudentNameFromPage();
@@ -803,13 +820,18 @@
         }
 
         await sleep(800);
-        if (isHalted || !autoCruiseActive) { isProcessingCurrent = false; return; }
+        if (token !== activeRunToken || isHalted || !autoCruiseActive) { isProcessingCurrent = false; return; }
 
-        setStatus(`💾 [Cruising] Saving Draft/Update: ${student}...`, '#007a4d');
-        triggerSave();
+        setStatus(`💾 [Cruising] Saving Draft: ${student}...`, '#007a4d');
+        const saveOk = triggerSave();
+        if (!saveOk) {
+            stopCruise(`⚠️ Save Draft button not found or disabled for ${student}. Paused for verification.`, '#dc3545');
+            isProcessingCurrent = false;
+            return;
+        }
 
         await sleep(1800);
-        if (isHalted || !autoCruiseActive) { isProcessingCurrent = false; return; }
+        if (token !== activeRunToken || isHalted || !autoCruiseActive) { isProcessingCurrent = false; return; }
 
         autoConfirmDialog();
 
@@ -819,7 +841,7 @@
 
         setStatus(`⏭️ [Cruising] Advancing to next student...`, '#006fbf');
         await sleep(500);
-        if (isHalted || !autoCruiseActive) { isProcessingCurrent = false; return; }
+        if (token !== activeRunToken || isHalted || !autoCruiseActive) { isProcessingCurrent = false; return; }
 
         const navRes = deepClickNext();
         if (navRes === 'DISABLED') {
@@ -1136,9 +1158,9 @@
                         setStatus('🚀 Starting Auto-Cruise...', '#198754');
                     }
 
-                    cruiseStep();
+                    cruiseStep(currentToken);
                     if (!cruiseInterval) {
-                        cruiseInterval = setInterval(cruiseStep, 2000);
+                        cruiseInterval = setInterval(() => cruiseStep(currentToken), 2000);
                     }
                 } else {
                     stopCruise('⏸️ Auto-Cruise paused', '#006fbf');
@@ -1292,7 +1314,8 @@
                     }
 
                     if (duplicateNames.length > 0) {
-                        alert(`⚠️ Warning: Detected ${duplicateNames.length} duplicate student name(s) in CSV:\n- ${duplicateNames.slice(0, 5).join('\n- ')}\n\nPlease disambiguate student names to avoid grade overwrites.`);
+                        alert(`❌ CSV Import Blocked: Detected ${duplicateNames.length} duplicate student name(s) in CSV:\n- ${duplicateNames.slice(0, 5).join('\n- ')}\n\nTo prevent grade overwriting, each student name in the CSV must be unique.`);
+                        return; // HARD BLOCK: do NOT save database or proceed!
                     }
 
                     saveStudentDatabase(db);

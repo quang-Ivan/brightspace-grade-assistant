@@ -51,12 +51,11 @@ Click the 1-click install link below:
 - Saving an evaluation in the **Consistent Evaluation** interface automatically synchronizes the points into the **Brightspace Gradebook (`Grades`)**.
 - **You NO LONGER need to manually upload CSVs to the backend `Grades ➔ Import` page!** This script handles both rubric feedback injection and gradebook synchronization simultaneously through the GUI.
 
-### 2. Save Draft vs. Publish: Is It Safe?
-**100% Safe.** 
-- For new assignments, the script **strictly clicks "Save Draft"** (it **never** clicks "Publish" on drafts).
-- Grades and feedback remain completely hidden from students while grading is underway.
-- Once you finish and review the entire class, you can release all grades simultaneously with a single click using Brightspace's official **"Publish All"** button on the Submissions list.
-- *(Note: If an assignment was already published previously, the script clicks "Update" to refresh the score and feedback).*
+### 2. Save Draft vs. Publish Workflow
+- For unreleased assignments, the script **strictly targets "Save Draft"** (it **never** clicks "Publish" on drafts).
+- Grades and feedback remain completely hidden in draft mode while grading is underway.
+- Once you finish and review the class, release all grades simultaneously with a single click using Brightspace's official **"Publish All"** button on the Submissions list.
+- *(Safety Notice: If an evaluation was already published to students previously, the script halts to prevent inadvertent live gradebook overwrites).*
 
 > 📖 **Want to know more about the underlying mechanics?**  
 > Read our comprehensive **[In-Depth Technical Guide & Architecture Manual](docs/IN_DEPTH_GUIDE.md)** for a deep-dive into Shadow DOM traversal, Siren/TinyMCE event synchronization, state machine flowcharts, and FERPA auditing.
