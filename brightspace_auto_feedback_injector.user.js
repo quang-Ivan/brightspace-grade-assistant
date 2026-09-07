@@ -292,7 +292,7 @@
             }
         }
 
-        // Verify feedback is actually populated!
+        // Verify feedback is actually populated and matches expected feedback!
         if (expectedFeedback && expectedFeedback.trim().length > 0) {
             const ed = deepQuery('d2l-htmleditor')[0];
             const fb = deepQuery('d2l-consistent-evaluation-right-panel-feedback')[0];
@@ -302,9 +302,10 @@
             if (!currentHtml && toxIframe && toxIframe.contentDocument && toxIframe.contentDocument.body) {
                 currentHtml = toxIframe.contentDocument.body.innerHTML;
             }
-            const cleanText = (currentHtml || '').replace(/<[^>]*>/g, '').trim();
-            if (cleanText.length === 0) {
-                return false; // Feedback missing on page -> MUST NOT SKIP!
+            const cleanText = (currentHtml || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+            const normalizedExpected = expectedFeedback.replace(/\s+/g, ' ').trim();
+            if (cleanText.length === 0 || cleanText !== normalizedExpected) {
+                return false; // Feedback missing or modified in CSV -> MUST NOT SKIP!
             }
         }
 
@@ -752,6 +753,12 @@
         }
 
         const data = findStudentData(student, db);
+
+        // Ambiguity check MUST COME FIRST: Halt immediately if multiple students match page name
+        if (data && data.ambiguous) {
+            stopCruise(`⚠️ Multiple students in CSV match "${student}". Paused for manual TA selection.`, '#dc3545');
+            return;
+        }
 
         // 1. Unsubmitted student -> Auto-Skip & Advance
         if (!data || data.score === null || data.score === undefined || data.score === '' || data.submitted === false) {
@@ -1263,7 +1270,8 @@
                         return;
                     }
 
-                    const db = {};
+                    const stagedDb = {};
+                    const unsubmittedList = [];
                     const duplicateNames = [];
                     for (let i = 1; i < rows.length; i++) {
                         const row = rows[i];
@@ -1281,47 +1289,58 @@
                         }
 
                         if (name) {
-                            if (db[name]) {
+                            if (stagedDb[name]) {
                                 duplicateNames.push(name);
                             }
                             const rawScore = (sI !== -1 && row[sI] !== undefined) ? row[sI].trim() : '';
                             const re = (rI !== -1 && row[rI] !== undefined) ? row[rI].trim() : '';
                             
-                            // Validate numeric sanity
+                            // Validate numeric sanity (strictly decimal/float >= 0)
                             let isSubmitted = false;
                             let validatedScore = null;
                             if (rawScore !== '' && rawScore.toLowerCase() !== 'null' && rawScore.toLowerCase() !== 'none') {
-                                const num = Number(rawScore);
-                                if (!isNaN(num) && isFinite(num) && num >= 0) {
+                                if (/^\d+(\.\d+)?$/.test(rawScore)) {
                                     isSubmitted = true;
                                     validatedScore = rawScore;
                                 } else {
-                                    console.warn(`[D2L-AutoFeedback] Non-numeric score "${rawScore}" for student "${name}". Treated as unsubmitted.`);
+                                    console.warn(`[D2L-AutoFeedback] Non-numeric or invalid score "${rawScore}" for student "${name}". Treated as unsubmitted.`);
                                 }
                             }
                             
                             const rawOrgId = (oI !== -1 && row[oI]) ? row[oI].replace(/^#/, '').trim() : null;
-                            db[name] = {
+                            stagedDb[name] = {
                                 score: validatedScore,
                                 reason: re || (isSubmitted ? '' : 'No submission'),
                                 submitted: isSubmitted,
                                 orgId: rawOrgId
                             };
                             if (!isSubmitted) {
-                                markStudentProcessed(name, { unsubmitted: true, source: 'csv_unsubmitted' });
+                                unsubmittedList.push(name);
                             }
                         }
                     }
 
                     if (duplicateNames.length > 0) {
                         alert(`❌ CSV Import Blocked: Detected ${duplicateNames.length} duplicate student name(s) in CSV:\n- ${duplicateNames.slice(0, 5).join('\n- ')}\n\nTo prevent grade overwriting, each student name in the CSV must be unique.`);
-                        return; // HARD BLOCK: do NOT save database or proceed!
+                        return; // HARD BLOCK: zero side effects!
                     }
 
-                    saveStudentDatabase(db);
-                    document.getElementById('bs-csv-stats').textContent = `Loaded ${Object.keys(db).length} students from ${f.name} (Stored locally)`;
+                    // Reset previous progress map and in-memory set when a new CSV is imported
+                    const ctx = getAssignmentContextKey();
+                    try {
+                        localStorage.removeItem(`d2l_processed_map_${ctx}`);
+                    } catch(e) {}
+                    processedSet.clear();
+
+                    // Safely commit unsubmitted marks and database
+                    for (const un of unsubmittedList) {
+                        markStudentProcessed(un, { unsubmitted: true, source: 'csv_unsubmitted' });
+                    }
+
+                    saveStudentDatabase(stagedDb);
+                    document.getElementById('bs-csv-stats').textContent = `Loaded ${Object.keys(stagedDb).length} students from ${f.name} (Stored locally)`;
                     updateProgress();
-                    setStatus(`✔ Loaded ${Object.keys(db).length} students successfully!`, '#28a745');
+                    setStatus(`✔ Loaded ${Object.keys(stagedDb).length} students successfully!`, '#28a745');
                 };
                 r.readAsText(f);
             });

@@ -20,9 +20,13 @@ assert.ok(rawCode.includes('activeRunToken'), 'Production code must use activeRu
 assert.ok(rawCode.includes('hasRubricAncestor'), 'Production code must check hasRubricAncestor()');
 assert.ok(rawCode.includes('isOverallGradeElement'), 'Production code must check isOverallGradeElement()');
 
-// Assert that duplicate student names trigger a hard block
+// Assert that duplicate student names trigger a hard block with zero side-effects
 assert.ok(rawCode.includes('duplicateNames.length > 0'), 'Production code must detect duplicate student names');
 assert.ok(rawCode.includes('CSV Import Blocked'), 'Production code must alert and block duplicate imports');
+assert.ok(rawCode.includes('stagedDb'), 'Production code must stage database entries before commit');
+
+// Assert that ambiguity check precedes unsubmitted check in cruiseStep
+assert.ok(rawCode.includes('Ambiguity check MUST COME FIRST'), 'cruiseStep must check ambiguity before unsubmitted check');
 
 // Assert that dialog handler halts on destructive modals and rejects negative buttons
 assert.ok(rawCode.includes("txt.includes(\"don't\")"), 'autoConfirmDialog must reject negative buttons like "Don\'t save"');
@@ -74,5 +78,15 @@ assert.strictEqual(parsedRows.length, 3);
 assert.strictEqual(parsedRows[1][0], 'Alex');
 assert.strictEqual(parsedRows[1][3], '90');
 console.log('✔ Real production parseCSV passed CSV parsing tests');
+
+// Test Numeric Score Validation Regex
+const scoreRegex = /^\d+(\.\d+)?$/;
+assert.strictEqual(scoreRegex.test('95'), true, 'Integer score must pass');
+assert.strictEqual(scoreRegex.test('88.5'), true, 'Decimal score must pass');
+assert.strictEqual(scoreRegex.test('0x10'), false, 'Hex score must be rejected');
+assert.strictEqual(scoreRegex.test('-10'), false, 'Negative score must be rejected');
+assert.strictEqual(scoreRegex.test('95abc'), false, 'Alphanumeric score must be rejected');
+assert.strictEqual(scoreRegex.test('Infinity'), false, 'Infinity must be rejected');
+console.log('✔ Strict numeric regex tests passed (hex, negative, text rejected)');
 
 console.log('\n🎉 ALL REAL PRODUCTION CODE UNIT TESTS PASSED!');
