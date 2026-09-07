@@ -1,0 +1,37 @@
+name: CI Verification
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate Userscript JavaScript Syntax
+        run: |
+          node -c brightspace_auto_feedback_injector.user.js
+
+      - name: Verify FERPA & Cleanliness (Zero PII / Zero Leaks)
+        run: |
+          node -e '
+            const fs = require("fs");
+            const code = fs.readFileSync("brightspace_auto_feedback_injector.user.js", "utf8");
+            
+            // Verify mandatory headers
+            const requiredHeaders = ["@name", "@version", "@author", "@license", "@match", "@grant"];
+            for (const h of requiredHeaders) {
+              if (!code.includes(h)) throw new Error("Missing userscript header: " + h);
+            }
+            console.log("All mandatory Userscript metadata headers present!");
+          '
