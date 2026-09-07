@@ -36,6 +36,7 @@
     let isProcessingCurrent = false;
     let currentProcessingStudent = null;
     let cruiseInterval = null;
+    let wrapAroundPasses = 0;
     const processedSet = new Set();
 
     function getAssignmentId() {
@@ -583,6 +584,10 @@
         const count = processedUnion.size;
         const pct = total > 0 ? Math.round((count / total) * 100) : 0;
 
+        const submittedNames = Object.keys(db).filter(n => db[n] && db[n].submitted !== false && db[n].score !== null && db[n].score !== '');
+        const unsubmittedNames = Object.keys(db).filter(n => !submittedNames.includes(n));
+        const missingSubmitted = submittedNames.filter(n => !processedUnion.has(n));
+
         const pText = document.getElementById('bs-progress-text');
         const pBar = document.getElementById('bs-progress-bar');
         if (pText) pText.textContent = `Processed: ${count} / ${total} (${pct}%)`;
@@ -591,13 +596,11 @@
         // Missing students badge
         const missingEl = document.getElementById('bs-missing-badge');
         if (missingEl) {
-            const allNames = Object.keys(db);
-            const missing = allNames.filter(name => !processedUnion.has(name));
-            if (missing.length === 0) {
-                missingEl.textContent = '🎉 Entire class 100% processed!';
+            if (missingSubmitted.length === 0) {
+                missingEl.textContent = `🎉 All ${submittedNames.length} submitted students 100% complete! (${unsubmittedNames.length} unsubmitted skipped)`;
                 missingEl.style.color = '#28a745';
             } else {
-                missingEl.textContent = `Remaining: ${missing.length} students (Auto-covered during cruise)`;
+                missingEl.textContent = `Remaining submitted: ${missingSubmitted.length} students (Auto-covered)`;
                 missingEl.style.color = '#e67e22';
             }
         }
@@ -756,12 +759,19 @@
         const db = getStudentDatabase();
         const map = getProcessedMap();
         const processedUnion = new Set([...Object.keys(map), ...processedSet]);
-        const total = Object.keys(db).length;
-        const missing = Object.keys(db).filter(n => !processedUnion.has(n));
+        
+        // Only require wrap-around for students who actually SUBMITTED homework
+        const submittedStudents = Object.keys(db).filter(n => {
+            const s = db[n];
+            return s && s.submitted !== false && s.score !== null && s.score !== undefined && s.score !== '';
+        });
+        const missingSubmitted = submittedStudents.filter(n => !processedUnion.has(n));
 
-        if (missing.length > 0 && !isAtFirstStudent() && getAutoRewindPref()) {
-            setStatus(`🔄 Reached end, but ${missing.length} students remain unvisited! Auto-rewinding to cover...`, '#e67e22');
-            console.log('[D2L-AutoFeedback] Wrap-around: rewinding to beginning to cover missing students:', missing);
+        // Trigger wrap-around only if genuinely submitted students are missing AND we haven'''t already done a wrap-around pass
+        if (missingSubmitted.length > 0 && !isAtFirstStudent() && getAutoRewindPref() && wrapAroundPasses < 1) {
+            wrapAroundPasses++;
+            setStatus(`🔄 Reached end, but ${missingSubmitted.length} submitted students remain! Auto-rewinding (pass ${wrapAroundPasses})...`, '#e67e22');
+            console.log('[D2L-AutoFeedback] Wrap-around: rewinding to beginning to cover missing submitted students:', missingSubmitted);
             await sleep(1000);
             await rewindToFirstStudent();
             setStatus('📍 Returned to start of roster, continuing cruise to cover remaining students...', '#006fbf');
@@ -769,7 +779,11 @@
         }
 
         playSuccessChime();
-        stopCruise('🎉 Reached end of roster. Entire class 100% completed!', '#28a745');
+        const unsubmittedCount = Object.keys(db).length - submittedStudents.length;
+        const completeMsg = unsubmittedCount > 0 
+            ? `🎉 All ${submittedStudents.length} submitted assignments 100% graded! (${unsubmittedCount} unsubmitted students safely skipped)`
+            : '🎉 Reached end of roster. Entire class 100% completed!';
+        stopCruise(completeMsg, '#28a745');
     }
 
     function copyCurrentFeedback() {
@@ -1020,6 +1034,7 @@
                 if (autoCruiseActive) {
                     isProcessingCurrent = false;
                     currentProcessingStudent = null;
+                    wrapAroundPasses = 0;
                     cruiseBtn.textContent = '⏸️ Auto-Cruising... (Click to Pause)';
                     cruiseBtn.style.background = '#dc3545';
 
@@ -1154,6 +1169,9 @@
                                 reason: re || (isSubmitted ? '' : 'No submission'),
                                 submitted: isSubmitted
                             };
+                            if (!isSubmitted) {
+                                markStudentProcessed(name, { unsubmitted: true, source: 'csv_unsubmitted' });
+                            }
                         }
                     }
 
