@@ -1136,6 +1136,7 @@
                     
                     let lI = headers.findIndex(h => h === 'last name' || h.includes('last name') || h === 'lastname');
                     let fI = headers.findIndex(h => h === 'first name' || h.includes('first name') || h === 'firstname');
+                    let oI = headers.findIndex(h => h.includes('orgdefinedid') || h.includes('org defined id') || h === 'id' || h.includes('student id') || h.includes('emplid'));
                     let nI = -1;
                     if (lI === -1 || fI === -1) {
                         nI = headers.findIndex(h => h === 'student' || h === 'name' || h === 'student name' || h === 'full name' || h.includes('student') || h.includes('name'));
@@ -1164,10 +1165,12 @@
                             const re = (rI !== -1 && row[rI] !== undefined) ? row[rI].trim() : '';
                             const isSubmitted = sc !== '' && sc !== null && sc !== undefined && sc.toLowerCase() !== 'null' && sc.toLowerCase() !== 'none';
                             
+                            const rawOrgId = (oI !== -1 && row[oI]) ? row[oI].replace(/^#/, '').trim() : null;
                             db[name] = {
                                 score: isSubmitted ? sc : null,
                                 reason: re || (isSubmitted ? '' : 'No submission'),
-                                submitted: isSubmitted
+                                submitted: isSubmitted,
+                                orgId: rawOrgId
                             };
                             if (!isSubmitted) {
                                 markStudentProcessed(name, { unsubmitted: true, source: 'csv_unsubmitted' });

@@ -416,12 +416,15 @@
 
       <h3 style="font-size:1.2rem; margin-top:24px; margin-bottom:8px; color:var(--dark);">Format B: Brightspace Export (With Optional Feedback Column)</h3>
       <p style="color:var(--text-muted); font-size:14px; margin-bottom:8px;">
-        If you exported your roster from Brightspace, you can add a <code>Feedback</code> column to inject both scores and feedback simultaneously:
+        If you exported your roster from Brightspace, you can add a <code>Feedback</code> column to inject both scores and feedback simultaneously into this userscript:
       </p>
       <pre><code>OrgDefinedId,Last Name,First Name,Homework 1 Points Grade &lt;Numeric MaxPoints:100&gt;,Feedback,End-of-Line Indicator
 #112233445,Smith,Alice,95.0,"Excellent work! All answers completely correct.",#
 #112233446,Jones,Bob,88.5,"Good job. Note: check units on problem 2.",#
 #112233447,Brown,Charlie,,No submission,#</code></pre>
+      <p style="background:#fff3cd; border-left:4px solid #ffc107; padding:10px 14px; font-size:13px; color:#856404; border-radius:4px; margin-top:8px;">
+        <strong>Note:</strong> Format B with a <code>Feedback</code> column is designed specifically for this userscript. Do not upload it to Brightspace's native Gradebook Import (<em>Grades ➔ Import</em>), which only accepts pure numeric columns.
+      </p>
 
       <h2 style="font-size:1.8rem; margin-top:50px; margin-bottom:16px;">Keyboard Shortcuts</h2>
       <table>

@@ -115,17 +115,26 @@ student,score,reason
 
 ### Format B: Brightspace Export Format (Supports Both Score & Feedback!)
 
-Brightspace's official Gradebook Export by default only contains numeric points columns. **However, both scores and feedback CAN be provided in Format B!**
+Brightspace's official Gradebook Export by default only contains numeric points columns. **However, both scores and feedback CAN be handled in Format B!**
 
-#### Option B1: With Feedback (Add a `Feedback` Column)
-Simply insert a column titled `Feedback` (or `Comments` / `Reason`) into your exported spreadsheet:
+#### Option B1: With Feedback (Userscript-Enhanced Format)
+You can insert a custom column titled `Feedback` (or `Comments` / `Reason`) into your exported spreadsheet:
 ```csv
 OrgDefinedId,Last Name,First Name,Homework 1 Points Grade <Numeric MaxPoints:100>,Feedback,End-of-Line Indicator
 #112233445,Smith,Alice,95.0,"Excellent work! All answers completely correct.",#
 #112233446,Jones,Bob,88.5,"Good job. Note: check units on problem 2.",#
 #112233447,Brown,Charlie,,No submission,#
 ```
-> The script automatically detects the `Feedback` / `Comments` / `Reason` column and injects it into Brightspace's rich-text feedback editor!
+> [!WARNING]
+> **Important Notice on Option B1 Compatibility**:
+> Option B1 (adding a `Feedback` column) is a **custom format designed specifically for this Userscript**.
+> - **DO NOT upload Option B1 directly to Brightspace's official Gradebook Import tool (`Grades ➔ Import`)**, because Brightspace's server-side validator only accepts pre-configured numeric grade item columns and will throw an `Unrecognized column: Feedback` error!
+> - Use **Option B1** inside this **Userscript** on the evaluation page to inject both grades & rich text comments.
+> - If you ever want to use Brightspace's native Gradebook Import tool, use **Option B2** (numeric points only, without the extra column).
+
+> [!NOTE]
+> **OrgDefinedId vs Names in Brightspace**:
+> In Brightspace's official database, whenever `OrgDefinedId` (Student ID) is present, **Brightspace considers `OrgDefinedId` as the absolute primary key and ignores `First Name` / `Last Name`**. Our userscript preserves `OrgDefinedId` alongside student names to ensure 100% data integrity!
 
 #### Option B2: Score Only (Native Brightspace Export as-is)
 If you only want to auto-fill numeric grades and don't need overall feedback:
@@ -135,7 +144,7 @@ OrgDefinedId,Last Name,First Name,Homework 1 Points Grade <Numeric MaxPoints:100
 #112233446,Jones,Bob,88.5,#
 #112233447,Brown,Charlie,,#
 ```
-The script will automatically detect `First Name` + `Last Name`, fill the score, and leave the feedback field untouched.
+The script will automatically detect `First Name` + `Last Name`, fill the score, and leave the feedback field untouched. This file is also 100% compatible with Brightspace's native `Grades ➔ Import` tool.
 
 ---
 
