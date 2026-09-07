@@ -768,7 +768,7 @@
         const missingSubmitted = submittedStudents.filter(n => !processedUnion.has(n));
 
         // Trigger wrap-around only if genuinely submitted students are missing AND we haven'''t already done a wrap-around pass
-        if (missingSubmitted.length > 0 && !isAtFirstStudent() && getAutoRewindPref() && wrapAroundPasses < 1) {
+        if (missingSubmitted.length > 0 && !isAtFirstStudent() && getAutoRewindPref() && wrapAroundPasses < 2) {
             wrapAroundPasses++;
             setStatus(`🔄 Reached end, but ${missingSubmitted.length} submitted students remain! Auto-rewinding (pass ${wrapAroundPasses})...`, '#e67e22');
             console.log('[D2L-AutoFeedback] Wrap-around: rewinding to beginning to cover missing submitted students:', missingSubmitted);

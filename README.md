@@ -60,27 +60,125 @@ Click the 1-click install link below:
 
 ---
 
+## 📁 Why Start with a CSV File?
+
+### 💡 The Modern Grading Workflow
+Grading software generally forces you to do two things at once:
+1. **Evaluate work** (reading code/reports, calculating rubrics, writing constructive feedback).
+2. **Data entry into the LMS** (clicking through menus, waiting for page reloads, pasting into web forms).
+
+Doing both simultaneously inside Brightspace is agonizingly slow. **Brightspace Feedback & Grade Assistant** decouples these two tasks:
+- You calculate grades and write feedback in your favorite offline environment (Excel, Google Sheets, Jupyter Notebooks, Autograding scripts, or LLM-assisted rubrics).
+- You export your results to a **CSV file** (your local Master Record).
+- The userscript reads this CSV and handles **100% of the repetitive Brightspace data entry, saving, and navigation in seconds**.
+
+#### Key Benefits:
+- 🔒 **100% FERPA Compliant**: Your student data never leaves your computer or touches an external server.
+- 🗂️ **Auditable Master Record**: You retain a clean, permanent CSV record of every grade and rubric deduction offline.
+- ⚡ **Lightning Fast**: Batch-inject 50–500 students in 2 minutes instead of 2 hours.
+
+---
+
 ## 📋 CSV Format Specification
 
-You can upload either format. A ready-to-use template is available in [`sample_grades.csv`](sample_grades.csv).
+The userscript natively understands both simple custom spreadsheets and official Brightspace exports. A starter template is provided in [`sample_grades.csv`](sample_grades.csv).
 
 ### Format A: Simple 3-Column CSV (Recommended)
 ```csv
 student,score,reason
 "Alice Smith",95.0,"Excellent work! Problem 1 and Problem 2 are completely correct."
-"Bob Jones",88.5,"Good submission. Remember to include physical units on final answers."
+"Bob Jones",88.5,"Good submission. Note: check units and label all axes on problem 2."
 "Charlie Brown",,"No submission"
+"Diana Prince",92.0,"<p><b>Part A:</b> 50/50</p><p><b>Part B:</b> 42/50 (-8: calculation error)</p>"
 ```
-- `student`: Full name matching the student's name on Brightspace (e.g. `First Last` or `Last, First`).
-- `score`: Numeric points. Leave empty for unsubmitted students.
-- `reason`: Multi-line text or HTML rubric comments.
 
-### Format B: Brightspace Native Export Format
+#### Column Rules:
+| Column | Required | Description | Examples |
+| :--- | :---: | :--- | :--- |
+| **`student`** | **Yes** | Full student name. Matches the student name displayed on Brightspace. Supports `First Last` or `Last, First`. | `"Alice Smith"`, `"Smith, Alice"` |
+| **`score`** | **Yes** | Numeric grade points. **For unsubmitted students, leave this completely blank!** | `95`, `95.0`, `8.0`, `""` *(blank)* |
+| **`reason`** | Optional | Overall feedback comments. Supports plain text, multiple lines (wrapped in double quotes), or formatted HTML. | `"Great work!"`, `"<p>Good job</p>"` |
+
+> [!TIP]
+> **Handling Unsubmitted Students**: Simply leave the `score` column blank (e.g. `"Charlie Brown",,"No submission"`). The script will automatically detect the absence of a grade, mark the student as `⚠️ [Unsubmitted]`, and smoothly advance to the next student without stalling!
+
+### Format B: Brightspace Official Gradebook Export Format
+If you already exported your course roster from Brightspace, you can use that file directly:
 ```csv
 OrgDefinedId,Last Name,First Name,Homework 1 Points Grade <Numeric MaxPoints:100>,End-of-Line Indicator
 #112233445,Smith,Alice,95.0,#
 #112233446,Jones,Bob,88.5,#
 #112233447,Brown,Charlie,,#
+```
+The script will automatically detect `First Name` + `Last Name` and extract the points column!
+
+---
+
+## 🛠️ How to Create Your CSV File (3 Simple Workflows)
+
+Here are the three easiest ways to prepare your grade CSV:
+
+### Workflow 1: From Brightspace Export (Zero Manual Typing of Names)
+If you want an exact list of all student names in your course without typing them:
+1. In Brightspace, navigate to **Grades** ➔ **Enter Grades** ➔ **Export**.
+2. Under **Key Field**, select `Both` or `OrgDefinedId`.
+3. Under **User Details**, check `Last Name` and `First Name`.
+4. Under **Choose Grades to Export**, check your target Assignment (e.g. `Homework 1`).
+5. Click **Export to CSV**.
+6. Open the downloaded file in Microsoft Excel or Google Sheets, fill in the scores and comments, and click **Save as CSV**.
+
+---
+
+### Workflow 2: From Excel or Google Sheets (Quick 3-Column Spreadsheet)
+1. Open Excel or Google Sheets and create a blank sheet.
+2. In the first row, create three headers:
+   - Cell `A1`: `student`
+   - Cell `B1`: `score`
+   - Cell `C1`: `reason`
+3. Enter your students:
+   - Type or paste student names in Column A.
+   - Enter numeric scores in Column B (leave blank for unsubmitted students).
+   - Enter feedback or rubric notes in Column C.
+4. Export the file:
+   - **In Excel**: Click **File** ➔ **Save As** ➔ Select file type **CSV (Comma delimited) (*.csv)**.
+   - **In Google Sheets**: Click **File** ➔ **Download** ➔ **Comma-separated values (.csv)**.
+
+---
+
+### Workflow 3: Automated Python / Jupyter / Autograder Workflow
+If you are a TA in Computer Science, Data Science, or Engineering running autograders or Python grading scripts, you can export directly from your grading script:
+
+```python
+import csv
+
+# Example grading output dictionary
+graded_students = [
+    {
+        "name": "Alice Smith",
+        "score": 100.0,
+        "feedback": "All unit tests passed. Code style is clean and well-documented."
+    },
+    {
+        "name": "Bob Jones",
+        "score": 85.0,
+        "feedback": "Problem 3 failed test case 2 (IndexError). All other tests passed."
+    },
+    {
+        "name": "Charlie Brown",
+        "score": None,  # No submission
+        "feedback": "No submission"
+    }
+]
+
+# Write to CSV ready for the userscript
+with open("homework1_grades.csv", "w", newline="", encoding="utf-8") as f:
+    writer = csv.writer(f)
+    writer.writerow(["student", "score", "reason"])
+    for s in graded_students:
+        score_val = s["score"] if s["score"] is not None else ""
+        writer.writerow([s["name"], score_val, s["feedback"]])
+
+print("Done! Upload homework1_grades.csv to the userscript in Brightspace.")
 ```
 
 ---

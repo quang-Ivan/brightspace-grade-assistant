@@ -370,8 +370,39 @@
       </div>
     </section>
 
+        <!-- How to Create CSV Section -->
+    <div class="container" style="padding-top:20px;">
+      <h2 style="font-size:2rem; margin-bottom:12px;">Why Start with a CSV File?</h2>
+      <p style="color:var(--text-muted); margin-bottom:30px;">
+        Traditional grading forces you to evaluate work and enter data into the LMS at the same time. This userscript decouples the two: you grade offline in your favorite environment (Excel, Google Sheets, Python autograders, or AI grading tools), and the userscript handles 100% of the Brightspace form entry, feedback injection, and navigation automatically.
+      </p>
+
+      <div class="grid-3" style="margin-top:0; margin-bottom:40px;">
+        <div class="card">
+          <div class="card-icon">📊</div>
+          <h3>Workflow 1: Brightspace Export</h3>
+          <p>
+            Go to <em>Grades ➔ Export</em> in Brightspace to download the class roster CSV with zero typing of names. Fill in the scores and save.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-icon">📑</div>
+          <h3>Workflow 2: Excel / Google Sheets</h3>
+          <p>
+            Create a simple 3-column sheet (<code>student</code>, <code>score</code>, <code>reason</code>). Leave unsubmitted students blank and export to CSV.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-icon">🐍</div>
+          <h3>Workflow 3: Python / Autograder</h3>
+          <p>
+            TAs running Jupyter notebooks or Python test suites can write results directly to a <code>grades.csv</code> with a single loop.
+          </p>
+        </div>
+      </div>
+
     <!-- CSV Format & Cheatsheet -->
-    <div class="container">
+    <div class="container" style="padding-top:0;">
       <h2 style="font-size:1.8rem; margin-bottom:16px;">Supported CSV Formats</h2>
       <p style="color:var(--text-muted); margin-bottom:16px;">
         You can upload standard 3-column spreadsheets or Brightspace official gradebook exports:
