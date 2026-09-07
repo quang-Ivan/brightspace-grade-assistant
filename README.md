@@ -55,6 +55,9 @@ Click the 1-click install link below:
 - Once you finish and review the entire class, you can release all grades simultaneously with a single click using Brightspace's official **"Publish All"** button on the Submissions list.
 - *(Note: If an assignment was already published previously, the script clicks "Update" to refresh the score and feedback).*
 
+> 📖 **Want to know more about the underlying mechanics?**  
+> Read our comprehensive **[In-Depth Technical Guide & Architecture Manual](docs/IN_DEPTH_GUIDE.md)** for a deep-dive into Shadow DOM traversal, Siren/TinyMCE event synchronization, state machine flowcharts, and FERPA auditing.
+
 ---
 
 ## 🌟 Features at a Glance
