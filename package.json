@@ -1,0 +1,14 @@
+{
+  "name": "brightspace-grade-assistant",
+  "version": "1.0.3",
+  "private": true,
+  "description": "Local verification tooling for Brightspace (D2L) CSV Grade & Feedback Auto-Filler",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test tests/userscript_unit_test.js",
+    "check": "node --check brightspace_auto_feedback_injector.user.js"
+  },
+  "devDependencies": {
+    "jsdom": "26.1.0"
+  }
+}

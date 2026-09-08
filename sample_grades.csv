@@ -1,6 +1,6 @@
 student,score,reason
-Alice Smith,100.0,Outstanding work! All statistical formulas and derivations are completely accurate. Graphs are thoroughly labeled with clear units.
-Bob Jones,92.5,"Great effort overall. Note for improvement: On Problem 3.5, make sure to discuss keypunch errors; on Problem 3.11, include physical units on the y-axis."
-Charlie Brown,,No submission
-Diana Prince,88.0,"Good submission. In Problem 3.7, explicit derivation for nonlinear scale transformation was omitted (-12.0). All other problems well executed."
-Evan Wright,75.0,Incomplete submission: Problem 3.15 boxplots and correlation interpretation are missing (-25.0). Good work on the earlier sections.
+Alice Example,95.0,"Strong work with a clear method and conclusion."
+Bob Example,88.5,"Good work, with one note for improvement: label the axes clearly."
+Casey Example,,"No submission"
+Drew Example,72.0,"The main method is present.
+Please show the intermediate calculation on the next revision."

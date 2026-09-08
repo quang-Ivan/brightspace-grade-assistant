@@ -1,229 +1,186 @@
-# 📖 Deep-Dive Technical Guide & Architecture Manual
+# In-Depth Guide: Brightspace (D2L) CSV Grade & Feedback Auto-Filler
 
-This document provides an exhaustive, technical breakdown of **Brightspace Feedback & Grade Assistant** for instructors, TAs, and developers seeking an in-depth understanding of the system architecture, DOM piercing mechanics, Brightspace event lifecycle, and security guarantees.
+> Technical reference for v1.0.3. For installation and everyday use, start with the [step-by-step user guide](USER_GUIDE.md).
 
----
+This advanced guide explains student matching, local state, CSV validation, and the verified-save state machine. Brightspace layouts and controls can differ by institution and course configuration.
 
-## 📑 Table of Contents
-1. [The Two-Phase Grading Workflow (Draft vs. Publish)](#1-the-two-phase-grading-workflow-draft-vs-publish)
-2. [Why Backend Gradebook CSV Upload Is Obsolete](#2-why-backend-gradebook-csv-upload-is-obsolete)
-3. [Deep Web Component & Shadow DOM Piercing](#3-deep-web-component--shadow-dom-piercing)
-4. [The Feedback Persistence Bug & The Siren/Blur Event Solution](#4-the-feedback-persistence-bug--the-sirenblur-event-solution)
-5. [Zero-Miss Roster Traversal State Machine](#5-zero-miss-roster-traversal-state-machine)
-6. [Fast Skip & Non-Empty Validation](#6-fast-skip--non-empty-validation)
-7. [Comprehensive CSV Formatting & Edge Cases](#7-comprehensive-csv-formatting--edge-cases)
-8. [FERPA Compliance & Security Audit](#8-ferpa-compliance--security-audit)
+## Contents
 
----
+1. [Scope and lifecycle](#1-scope-and-lifecycle)
+2. [CSV ingestion and identity](#2-csv-ingestion-and-identity)
+3. [Target isolation and plaintext feedback](#3-target-isolation-and-plaintext-feedback)
+4. [Verified save state machine](#4-verified-save-state-machine)
+5. [Traversal, resume, and stop behavior](#5-traversal-resume-and-stop-behavior)
+6. [Brightspace release boundaries](#6-brightspace-release-boundaries)
+7. [Local state and privacy limits](#7-local-state-and-privacy-limits)
+8. [Testing and acceptance](#8-testing-and-acceptance)
 
-## 1. The Two-Phase Grading Workflow (Draft vs. Publish)
+## 1. Scope and lifecycle
 
-In university environments, releasing grades student-by-student while grading is actively underway is considered bad practice:
-- Students who receive notifications early often contact peers, causing confusion and emails to instructors.
-- Instructors or TAs frequently need to adjust curves or rubric penalties mid-way through grading.
+The userscript runs in the TA's or instructor's browser on a Brightspace Consistent Evaluation page. The intended flow is:
 
-To solve this, the userscript implements a strict **Two-Phase Grading Model**:
-
-```
-+-----------------------------------------------------------------------------------+
-| PHASE 1: Automated Local Draft Ingestion (Userscript)                              |
-|                                                                                   |
-|  [ Gradebook CSV ] ---> [ Userscript Auto-Cruise ]                                |
-|                                |                                                  |
-|                                v                                                  |
-|                     Clicks "Save Draft" Only                                      |
-|                     (or "Update" if pre-published)                                |
-|                                |                                                  |
-|                                v                                                  |
-|                     Grades Stored as DRAFTS                                       |
-|                     (Hidden from student view)                                    |
-+-----------------------------------------------------------------------------------+
-                                         |
-                                         v (Review complete)
-+-----------------------------------------------------------------------------------+
-| PHASE 2: Official Batch Release (Instructor Discretion)                           |
-|                                                                                   |
-|  Instructor opens Brightspace Submissions List ➔ Clicks "Publish All"             |
-|  ➔ All students receive grades and rubric notifications simultaneously.           |
-+-----------------------------------------------------------------------------------+
-```
-
-### Critical Behavioral Guarantees:
-- **Never Prematurely Publishes**: The script's `triggerSave()` function looks strictly for `save draft`, `update`, or `save`. It **never** clicks the primary `Publish` button on draft submissions.
-- **Audit Before Release**: The instructor retains 100% control over when grades go live. You can inspect any student's draft in Brightspace before making the final release.
-
----
-
-## 2. Why Backend Gradebook CSV Upload Is Obsolete
-
-In traditional Brightspace grading, instructors often performed redundant work:
-1. Exporting a CSV, editing it, and uploading it through `Grades ➔ Enter Grades ➔ Import`.
-2. Manually visiting each assignment submission to copy-paste feedback paragraphs.
-
-### The Automated Solution:
-In Brightspace, assignments are linked to Grade Items. When an evaluation is saved inside the **Consistent Evaluation** interface:
-- Brightspace's backend **automatically propagates the points directly into the official Gradebook (`Grades`)**.
-- As a result, using this userscript eliminates the need to ever visit the backend `Grades ➔ Import` page. Both points and rich-text feedback comments are delivered simultaneously in a single automated pass.
-
----
-
-## 3. Deep Web Component & Shadow DOM Piercing
-
-Modern D2L Brightspace relies heavily on **LitElement**, custom elements, and multi-tier encapsulated **Shadow DOM** boundaries. Standard DOM queries such as `document.querySelector('input')` fail because inputs are hidden inside shadow roots.
-
-### The Recursive `deepQuery` Engine:
-The userscript implements a cross-boundary tree crawler:
-```javascript
-function deepQuery(selector, root = document) {
-    let matches = Array.from(root.querySelectorAll(selector));
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT, null, false);
-    let node;
-    while ((node = walker.nextNode())) {
-        if (node.shadowRoot) {
-            matches = matches.concat(deepQuery(selector, node.shadowRoot));
-        }
-    }
-    // Cross same-origin iframes
-    const iframes = root.querySelectorAll('iframe');
-    for (const iframe of iframes) {
-        try {
-            if (iframe.contentDocument) {
-                matches = matches.concat(deepQuery(selector, iframe.contentDocument));
-            }
-        } catch(e) {}
-    }
-    return matches;
-}
+```text
+real task CSV
+     |
+     v
+validate and stage rows  -- any validation error -->  import blocked
+     |
+     v
+identify same student and assignment
+     |
+     v
+fill unique overall grade + overall feedback controls
+     |
+     v
+click exact native "Save Draft"
+     |
+     v
+wait for a fresh native save acknowledgement
+     |
+     v
+full page reload
+     |
+     v
+re-identify same student/context + read back score and feedback
+     |                                      |
+     v                                      v
+verified -> resume cruise/navigation       mismatch or timeout -> pause
 ```
 
-### Score Input Traversal:
-To inject the numeric score, the crawler penetrates:
-`<d2l-consistent-evaluation>` ➔ Shadow Root ➔ `<d2l-input-number>` ➔ Shadow Root ➔ `<d2l-input-text>` ➔ Shadow Root ➔ native `<input type="text">`.
-It sets the value and dispatches native `input`, `change`, and custom LitElement events to ensure Brightspace's internal reactivity registers the change.
+Only an exact, unique, enabled native **Save Draft** control is an eligible save target. The script does not substitute `Update`, `Publish`, or generic `Save`. Each save includes a page refresh and value check; timing depends on Brightspace's response and the page load.
 
----
+The script changes only the overall grade and overall feedback fields. Rubric criteria, rubric scores, and unrelated editors are out of scope. It operates through page controls and their normal UI events: it does not make its own network requests or call a grading API directly. Brightspace handles server communication, including temporary saving while fields are edited. **Fill Current** means no explicit Save Draft or Publish click. See D2L's [evaluation guide](https://community.d2l.com/brightspace/kb/articles/34714-evaluate-assignment-activities) for the platform's own save behavior.
 
-## 4. The Feedback Persistence Bug & The Siren/Blur Event Solution
+## 2. CSV ingestion and identity
 
-One of the most complex challenges in automating Brightspace Consistent Evaluation is that injecting HTML into the TinyMCE iframe alone **does not persist** upon saving. 
+The importer accepts a local simple format or a copy of an official course export. Whichever format is used, it must have exactly one unambiguous grade column. A grade-item header from an official export is accepted as-is; do not place competing `score`, `grade`, or `points` columns in the same file. `reason` or `Feedback` is a separate plaintext column for the userscript.
 
-### Root Cause Analysis:
-Brightspace wraps the feedback editor in:
-```html
-<d2l-consistent-evaluation-right-panel-feedback>
-  <d2l-htmleditor>
-    <iframe class="tox-edit-area__iframe">...</iframe>
-  </d2l-htmleditor>
-</d2l-consistent-evaluation-right-panel-feedback>
+### Validation and staging
+
+Rows are staged before the existing local database or progress state is replaced. Import is blocked with no staged-data commit when validation finds a hard conflict:
+
+- duplicate IDs block the whole import;
+- an explicit page ID that conflicts with a CSV row is a stop condition, not a name-fallback opportunity;
+- a nonblank score that is not a valid non-negative decimal blocks the whole import;
+- a no-ID file must have unique names after the script's normalization;
+- a blank score explicitly marks an unsubmitted row. It is not an invalid score and is not a reason to write a grade.
+
+Identical display names are allowed when distinct supported IDs disambiguate them. If an ID is genuinely absent on the page, the script may use a unique normalized name. It must not fall back to a name when an ID is present but mismatched or when multiple records remain possible.
+
+### Using student IDs
+
+The supported ID column is **OrgDefinedId** (also accepted as **Org Defined ID**). It is the institution-defined identifier from Brightspace's official Grades export. The script does not treat a username, email address, internal Brightspace user number, or a number found in a page URL as an equivalent ID.
+
+1. Use a copy of the official export for the correct course. Keep the OrgDefinedId values unchanged, including leading zeros; a spreadsheet may need that column set to text.
+2. Keep the student's first and last name columns, one target numeric grade column, and at most one feedback column. Remove other grade-item columns from this copy, not from the original export.
+3. Keep the target grade column's heading exactly as exported. The example below shows the required shape, not a heading to substitute for your own course.
+4. Import the copy on an individual evaluation page and check the preview.
+
+Adding IDs to the CSV does not make an otherwise ambiguous page safe to match. To distinguish two students with the same name, the evaluation page must also expose their OrgDefinedId in a form this version recognizes. If it does not, the helper pauses; process those students manually using the official roster.
+
+Example local input:
+
+```csv
+student,score,reason
+Alice Example,95.0,"Strong work with a clear method and conclusion."
+Bob Example,88.5,"Good work. Note for improvement: label the axes more clearly."
+Casey Example,,"No submission"
 ```
-The outer web component `<d2l-consistent-evaluation-right-panel-feedback>` maintains its own internal state (`fb._feedbackText`). It **only** updates this property and dispatches the Siren update payload when it receives a custom **`d2l-htmleditor-blur`** event from `<d2l-htmleditor>`.
 
-Without this blur event, clicking "Save Draft" causes Brightspace to issue a REST call with an empty feedback payload (`fb._feedbackText === ""`).
+Example export-derived input:
 
-### The Three-Tier Synchronization Fix:
-The userscript executes a synchronized three-tier injection:
-```javascript
-// 1. Sync the underlying TinyMCE editor instance
-if (tiny && ed._editorId) {
-    const tEd = tiny.get(ed._editorId);
-    if (tEd) {
-        tEd.focus();
-        tEd.setContent(html);
-        tEd.save();
-        tEd.fire('change');
-    }
-}
-
-// 2. Dispatch the exact blur event that Brightspace expects
-ed.dispatchEvent(new CustomEvent('d2l-htmleditor-blur', { bubbles: true, composed: true }));
-
-// 3. Direct component state update without unverified background writes
-fbPanels.forEach(fb => {
-    fb._feedbackText = html;
-});
+```csv
+OrgDefinedId,Last Name,First Name,Target Points Grade <Numeric MaxPoints:100>,Feedback,End-of-Line Indicator
+#1001,Example,Alice,95.0,"Strong work with a clear method and conclusion.",#
+#1002,Example,Bob,88.5,"Good work. Note for improvement: label the axes more clearly.",#
+#1003,Example,Casey,,"No submission",#
 ```
-Draft persistence is then initiated explicitly by triggering Brightspace's native "Save Draft" action with cancellation token gating.
 
----
+The grade-item header in the second example is illustrative. For a real task, preserve the exact header from the current course export. A file containing `Feedback` is userscript input, not automatically a valid native Brightspace Gradebook import.
 
-## 5. Zero-Miss Roster Traversal State Machine
+### Plaintext feedback and CSV escaping
 
-Brightspace Consistent Evaluation uses an iterator model that by default only moves forward when the user clicks "Next Student".
+`Reason`/`Feedback` is treated as plaintext. Commas, quotes, and line breaks must follow ordinary CSV quoting rules. The userscript escapes special characters before placing the text into the Brightspace editor and preserves line breaks. HTML is not an input language: markup-looking text is displayed as text rather than interpreted as arbitrary markup.
 
-### State Machine Overview:
-1. **Auto-Rewind on Start**:
-   - When the user launches Auto-Cruise, the script evaluates `isAtFirstStudent()` (checking if `Previous Student` is disabled).
-   - If starting away from Student #1, it automatically steps backward (~400ms per step) until reaching Student #1.
-2. **Forward Cruise**:
-   - Grades submitted students, saves drafts, dismisses confirmation dialogs, and steps forward.
-   - Unsubmitted students are automatically flagged as `[Unsubmitted]` and skipped.
-3. **Wrap-Around & Infinite Loop Prevention**:
-   - When reaching the end of the roster (`Next Student` disabled), the script compares the set of evaluated students against the students in the CSV who submitted work.
-   - If any submitted students remain unvisited, it executes a wrap-around pass (rewinding to the start).
-   - **Safety Cap**: The number of wrap-around passes is strictly capped at 2 (`wrapAroundPasses < 2`), mathematically preventing infinite loops even if roster discrepancies occur.
+```csv
+student,score,reason
+"Alice Example",95.0,"Good work.
 
----
+Note for improvement: show the intermediate calculation on the next revision."
+```
 
-## 6. Fast Skip & Non-Empty Validation
+### Revision scope
 
-On repeated cruise runs, re-submitting already-graded students causes unnecessary network traffic and dialog delays.
+Local progress and verified records are scoped by course, assignment, and CSV revision. Changing any of those inputs, or upgrading from the older cache/record contract, requires importing the real task CSV again. The sample file is documentation only; no default sample database may write grades.
 
-### The Fast Skip Algorithm:
-1. When arriving at a student, the script checks `localStorage` and `processedSet`.
-2. **Feedback Verification Check**: Before skipping, it inspects the live page to verify that:
-   - The score on the page matches the expected score.
-   - The feedback container on the page actually contains non-empty text.
-3. If feedback was somehow wiped or missing from a previous run, the script **refuses to skip** and instead repairs the student by re-injecting the score and feedback and clicking Save/Update.
-4. If genuinely complete, it advances to the next student in **400ms**, enabling a 35-student class to be traversed in under 15 seconds.
+## 3. Target isolation and plaintext feedback
 
----
+Brightspace uses custom elements, Shadow DOM, and editor frames. The source traverses the page's reachable component boundaries so it can locate the current page's controls, but discovery is not permission to edit every matching element.
 
-## 7. Comprehensive CSV Formatting & Edge Cases
+Before filling, the script filters candidates to the overall grade and overall feedback controls. It pauses if a target is absent or ambiguous. Rubric ancestors and unrelated editors are explicitly excluded. This protects a rubric score from being overwritten when a similarly shaped numeric input is present.
 
-### Student Name Matching:
-On the Consistent Evaluation page, Brightspace displays the student's name in headers and titles:
-- `"Assignment Evaluation - First Last - Assignment Name"`
-- `"Evaluation for First Last on Assignment Name"`
+For feedback, the script synchronizes the editor's value and the events required by the current Brightspace editor integration. The logical input remains plaintext; escaping and line-break rendering are implementation details used to avoid interpreting student or instructor feedback as HTML.
 
-The userscript parses the CSV and matches against:
-- `First Last` (e.g. `Alice Smith`)
-- `Last, First` (e.g. `Smith, Alice`)
+## 4. Verified save state machine
 
-### Unsubmitted Students:
-To designate that a student did not submit:
-- In the CSV, leave the `score` column empty:
-  `"Charlie Brown",,"No submission"`
-- The parser interprets empty strings or null values as `submitted: false`.
-- The student is pre-marked as unsubmitted upon CSV load, preventing them from stalling navigation or causing false wrap-arounds.
+For a submitted row that needs a new draft save, the sequence is:
 
-### Multi-Line and HTML Feedback:
-Standard CSV rules apply:
-- Multi-line feedback must be enclosed in double quotes:
-  ```csv
-  "Alice Smith",95.0,"Great work!
-  
-  Notes:
-  - Check problem 2 units (-5)
-  - All other problems 100% correct."
-  ```
-- HTML formatting is fully supported:
-  ```csv
-  "Bob Jones",88.0,"<p>Good job!</p><ul><li>Part 1: 50/50</li><li>Part 2: 38/50</li></ul>"
-  ```
+1. Identify the student from the current page and resolve the row by supported ID or, only when the ID is absent, a unique normalized name.
+2. Locate exactly one overall grade control and exactly one overall feedback control. Pause on missing or ambiguous controls.
+3. Fill the nonnegative numeric score and escaped plaintext feedback.
+4. Locate exactly one enabled native control whose accessible/text label is **Save Draft** and click it. Do not click `Update`, `Publish`, or generic `Save`.
+5. Wait for a fresh native save acknowledgement. An old status message, a local cache entry, or a click event alone is not a fresh acknowledgement.
+6. Once the acknowledgement is observed, perform a full page reload.
+7. Recover the same course/assignment context, CSV revision, student identity, score, and feedback. The score and normalized feedback must match the row that was just saved.
+8. Mark the row verified and allow Auto-Cruise to resume or navigate.
 
----
+The readback is intentionally stronger than “the button was clicked.” A save acknowledgement proves that Brightspace reported that action; only the post-reload readback proves the expected record is present on the same page/context. If readback is unavailable or mismatched, the run pauses and the row remains unresolved.
 
-## 8. FERPA Compliance & Security Audit
+Save, publish/release, Gradebook synchronization, and student visibility are separate states. A saved draft may later synchronize to a configured Gradebook item, but that behavior is tenant/configuration-dependent and must be checked separately. The userscript never clicks a publish control.
 
-University privacy guidelines (FERPA in the United States, GDPR in Europe) strictly regulate handling student Personally Identifiable Information (PII):
+## 5. Traversal, resume, and stop behavior
 
-| Risk Vector | Userscript Mitigation |
-| :--- | :--- |
-| **Data Transmission** | **Zero network requests outside Brightspace**. No analytics, no telemetry, no CDN scripts. |
-| **Data Storage** | All CSV data is stored in the browser's origin-isolated `localStorage` under `https://<your-institution>.brightspace.com`. Other websites cannot access it. |
-| **Local File Reading** | Relies strictly on the HTML5 `FileReader` API in-memory. No files are uploaded to any external server. |
-| **Code Auditing** | 100% vanilla JavaScript. No obfuscation, no minification, no hidden eval. |
+Auto-Cruise can optionally rewind to the beginning of the iterator and move forward. Rewind and navigation are convenience operations; they do not waive identity or readback checks. A submitted row is not counted as complete merely because it was visited, filled, or present in local progress. Unsubmitted rows are explicitly skipped according to their blank score state.
 
----
+With **Skip matching existing evaluations** enabled, a published evaluation or a previously reload-verified draft can be skipped when the visible score and any supplied feedback match the current CSV. A published mismatch pauses before filling or clicking Update. A match is recorded as **existing matched**, not as a newly saved draft. The script remembers its own fills during the page's lifetime so that an unsaved fill cannot qualify as an existing match even if Brightspace's editor reports a clean state.
 
-*Authored by quang-Ivan | MIT License*
+After a verified readback, Auto-Cruise resumes using the same task scope. It pauses for:
+
+- an unrecognized save acknowledgement;
+- a failed, missing, or mismatched post-reload readback;
+- explicit or conflicting student identity evidence;
+- multiple or missing overall controls;
+- an unexpected, destructive, or unsaved-navigation dialog;
+- a navigation or full-reload timeout.
+
+Unknown, destructive, and unsaved-navigation dialogs are not auto-accepted. The script may observe a dialog while waiting, but it must not guess which button is safe. Manual review is required.
+
+Emergency Stop invalidates the active run token and all pending continuations. It cannot recall temporary-autosave or Save Draft requests that Brightspace has already sent, or undo server-side changes. Restart only after confirming the current page and task CSV revision.
+
+Because every save includes a reload and readback, completion time is not specified here. Report verified rows and paused rows from observed state; do not promise a fixed per-student rate or 100% completion without a representative live acceptance run.
+
+## 6. Brightspace release boundaries
+
+The userscript operates inside an existing instructor-authorized evaluation session. It does not grant permission to grade, upload, publish, or contact students. The instructor remains responsible for:
+
+- confirming the course, assignment, roster, and CSV are the intended ones;
+- reviewing the drafts and any paused state;
+- deciding when and how Brightspace publishes/releases grades;
+- checking Gradebook synchronization and the intended student-facing view;
+- following institutional policies for student data and automation.
+
+The native UI can send temporary field edits as well as explicit saves to Brightspace's server. A network request alone does not establish publication, student visibility, permanent persistence, or a complete roster. Use the current Brightspace page and relevant student-facing view for those checks.
+
+## 7. Local state and privacy limits
+
+The script has no direct network/API calls, telemetry, or third-party upload destination. It interacts with Brightspace's existing UI; requests made by Brightspace in response are platform behavior, not a separate transmission channel implemented by this script. CSV rows and progress are held in browser storage scoped to the LMS origin and course/assignment context. `localStorage` and `sessionStorage` on an LMS origin follow that origin's normal access rules.
+
+The project makes no blanket claim of FERPA/GDPR compliance, 100% security, permanent saved state, perfect completion, or immunity from detection or account action. “No telemetry” means this source does not intentionally send analytics or third-party requests; it does not change Brightspace's own server behavior or institutional obligations.
+
+## 8. Testing and acceptance
+
+The local project includes 34 production-core DOM/lifecycle tests with controlled timers, plus a separate browser fixture that runs the unmodified userscript against synthetic server-stored drafts. Coverage includes identity conflicts, strict/staged CSV import, unique controls, reload/readback, dialogs, cancellation, and the live-page fast-skip/navigation regressions. See [validation results](LOCAL_VALIDATION.md) and [test commands](../CONTRIBUTING.md).
+
+Automated tests provide local evidence only. The validation note separately records bounded live-page testing; real draft saving and post-save readback remain unverified. A live run should record the actual tenant controls, the exact course/assignment context, save acknowledgement, post-reload readback, and any remaining paused state.
+
+For implementation details, inspect [`brightspace_auto_feedback_injector.user.js`](../brightspace_auto_feedback_injector.user.js), the local [`README.md`](../README.md), and the fictional [`sample_grades.csv`](../sample_grades.csv).

@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Assignment Evaluation - Alice Smith - Fixture Homework</title>
+  <style>
+    :root { color-scheme: light; font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { margin: 0; background: #f4f6f8; color: #18232d; }
+    #simulation-banner { padding: 12px 18px; background: #7a1f1f; color: #fff; font-weight: 700; letter-spacing: .03em; }
+    main { max-width: 980px; margin: 24px auto; padding: 0 18px 80px; }
+    d2l-consistent-evaluation-header { display: block; padding: 18px; border: 1px solid #b8c6d2; border-radius: 7px; background: #fff; font-size: 19px; }
+    .subtle { color: #536575; font-size: 13px; }
+    .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; }
+    .card { padding: 18px; border: 1px solid #c5d0da; border-radius: 7px; background: #fff; }
+    .card h2 { margin: 0 0 12px; font-size: 17px; }
+    d2l-input-number { display: block; }
+    d2l-consistent-evaluation-right-panel-feedback { display: block; margin-top: 12px; padding: 12px; border: 1px solid #d1dbe3; border-radius: 5px; background: #fbfcfd; }
+    d2l-htmleditor { display: block; min-height: 96px; }
+    .rubric-editor { margin-top: 16px; border-left: 4px solid #97751b; }
+    .rubric-editor d2l-consistent-evaluation-right-panel-feedback { border-color: #e5d48e; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+    button { min-height: 38px; padding: 7px 15px; border: 1px solid #53708a; border-radius: 4px; background: #eaf1f6; color: #172b3a; font: inherit; cursor: pointer; }
+    button.primary { background: #0875be; border-color: #0875be; color: #fff; font-weight: 700; }
+    button:disabled { cursor: not-allowed; opacity: .5; }
+    .notice { margin-top: 14px; padding: 10px 12px; border-radius: 4px; background: #e8f2fb; color: #075b91; }
+    .notice[role="alert"] { background: #fde9e7; color: #9b2419; }
+    #fixture-loading { margin-top: 12px; color: #536575; }
+    @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div id="simulation-banner">LOCAL SIMULATION — no real LMS, credentials, network, or publication</div>
+  <main id="fixture-app">
+    <d2l-consistent-evaluation-header id="evaluation-header" data-org-defined-id="001">
+      Evaluation for Alice Smith on Fixture Homework · Org Defined ID: 001
+    </d2l-consistent-evaluation-header>
+    <p class="subtle">Synthetic Brightspace evaluation page. Draft saves are acknowledged by the local fixture server and never published.</p>
+    <div class="grid">
+      <section class="card" aria-label="Overall grade">
+        <h2>Overall Grade</h2>
+        <d2l-input-number id="d2l-grade" label="Overall Grade" max="100"></d2l-input-number>
+      </section>
+      <section class="card" aria-label="Overall feedback">
+        <h2>Overall Feedback</h2>
+        <d2l-consistent-evaluation-right-panel-feedback id="overall-feedback-panel">
+          <d2l-htmleditor id="overall-feedback" label="Overall Feedback"></d2l-htmleditor>
+        </d2l-consistent-evaluation-right-panel-feedback>
+      </section>
+    </div>
+    <section class="card rubric-editor" aria-label="Rubric editor">
+      <h2>Unrelated rubric criterion</h2>
+      <d2l-consistent-evaluation-right-panel-feedback id="rubric-feedback-panel">
+        <d2l-htmleditor id="rubric-feedback" label="Criterion Feedback"></d2l-htmleditor>
+      </d2l-consistent-evaluation-right-panel-feedback>
+    </section>
+    <div id="fixture-loading" hidden aria-live="polite">Loading synthetic student data…</div>
+    <div id="fixture-actions" class="actions">
+      <button id="previous-student" type="button">Previous Student</button>
+      <button id="next-student" type="button">Next Student</button>
+      <button id="save-draft" class="primary" type="button">Save Draft</button>
+    </div>
+    <div id="fixture-notices" aria-live="polite"></div>
+  </main>
+  <script>
+    (() => {
+      const query = () => new URL(window.location.href).searchParams;
+      const initialMode = query().get('mode') || 'default';
+      const app = document.getElementById('fixture-app');
+      const grade = document.getElementById('d2l-grade');
+      const overallPanel = document.getElementById('overall-feedback-panel');
+      const overallFeedback = document.getElementById('overall-feedback');
+      const rubricFeedback = document.getElementById('rubric-feedback');
+      const header = document.getElementById('evaluation-header');
+      const loading = document.getElementById('fixture-loading');
+      const previous = document.getElementById('previous-student');
+      const next = document.getElementById('next-student');
+      const notices = document.getElementById('fixture-notices');
+      const state = {mode: initialMode, students: [], index: 0, currentLoad: null, busy: false};
+
+      class D2lInputNumber extends HTMLElement {
+        constructor() {
+          super();
+          const shadow = this.attachShadow({mode: 'open'});
+          shadow.innerHTML = '<style>:host{display:block}input{box-sizing:border-box;width:100%;padding:10px;border:1px solid #8699a8;border-radius:4px;font:inherit}</style><input type="number">';
+          this.input = shadow.querySelector('input');
+          this.input.addEventListener('input', () => this.dispatchEvent(new Event('input', {bubbles: true, composed: true})));
+          this.input.addEventListener('change', () => this.dispatchEvent(new Event('change', {bubbles: true, composed: true})));
+        }
+        connectedCallback() {
+          this.input.max = this.getAttribute('max') || '100';
+          this.input.setAttribute('aria-label', this.getAttribute('label') || 'Overall Grade');
+        }
+        get value() { return this.input.value; }
+        set value(value) { this.input.value = value === null || value === undefined ? '' : String(value); }
+      }
+
+      class D2lHtmlEditor extends HTMLElement {
+        constructor() {
+          super();
+          const shadow = this.attachShadow({mode: 'open'});
+          shadow.innerHTML = '<style>:host{display:block}.content{box-sizing:border-box;min-height:96px;padding:10px;border:1px solid #8699a8;border-radius:4px;background:#fff;outline:none;white-space:pre-wrap}</style><div class="content" contenteditable="true"></div>';
+          this.content = shadow.querySelector('.content');
+          this.content.addEventListener('input', () => this.dispatchEvent(new Event('input', {bubbles: true, composed: true})));
+          this.content.addEventListener('change', () => this.dispatchEvent(new Event('change', {bubbles: true, composed: true})));
+          this.content.addEventListener('blur', () => this.dispatchEvent(new Event('blur', {bubbles: true, composed: true})));
+        }
+        get html() { return this._html || ''; }
+        set html(value) { this._html = String(value ?? ''); this.content.innerHTML = this._html; }
+      }
+      customElements.define('d2l-input-number', D2lInputNumber);
+      customElements.define('d2l-htmleditor', D2lHtmlEditor);
+      rubricFeedback.html = '<p>Unrelated rubric note must stay unchanged.</p>';
+
+      function current() { return state.students[state.index]; }
+      function clearNotices() { notices.replaceChildren(); }
+      function notice(message, role = 'status') {
+        const item = document.createElement('div');
+        item.className = 'notice'; item.setAttribute('role', role); item.textContent = message;
+        notices.append(item); return item;
+      }
+      async function readDraft(id) {
+        const response = await fetch('/api/drafts?orgDefinedId=' + encodeURIComponent(id), {cache: 'no-store'});
+        if (!response.ok) throw new Error('Draft read failed with HTTP ' + response.status + '.');
+        return (await response.json()).draft;
+      }
+      function updateIdentity(student) {
+        header.setAttribute('data-org-defined-id', student.OrgDefinedId);
+        header.textContent = 'Evaluation for ' + student.student + ' on Fixture Homework · Org Defined ID: ' + student.OrgDefinedId;
+        document.title = 'Assignment Evaluation - ' + student.student + ' - Fixture Homework';
+        previous.disabled = state.busy || state.index === 0;
+        next.disabled = state.busy || state.index === state.students.length - 1;
+      }
+      async function renderStudent() {
+        const student = current();
+        if (!student) return;
+        state.busy = true; app.setAttribute('aria-busy', 'true'); loading.hidden = false;
+        updateIdentity(student); grade.value = ''; overallFeedback.html = '';
+        const load = readDraft(student.OrgDefinedId); state.currentLoad = load;
+        try {
+          const draft = await load;
+          if (state.currentLoad === load && current().OrgDefinedId === student.OrgDefinedId) {
+            if (draft) { grade.value = draft.score; overallFeedback.html = draft.feedbackHtml; }
+          }
+        } finally {
+          if (state.currentLoad === load) { state.busy = false; app.removeAttribute('aria-busy'); loading.hidden = true; updateIdentity(student); }
+        }
+      }
+      function configureMode() {
+        if (state.mode === 'missing-save' || state.mode === 'published') document.getElementById('save-draft')?.remove();
+        if (state.mode === 'published') {
+          const update = document.createElement('button'); update.id = 'published-update'; update.type = 'button'; update.textContent = 'Update';
+          document.getElementById('fixture-actions').append(update);
+        }
+        if (state.mode === 'multi-feedback') {
+          const extra = document.createElement('d2l-htmleditor'); extra.id = 'extra-overall-feedback'; extra.label = 'Overall Feedback duplicate';
+          overallPanel.append(extra);
+        }
+      }
+      async function navigate(delta) {
+        if (state.busy) return;
+        const nextIndex = state.index + delta;
+        if (nextIndex < 0 || nextIndex >= state.students.length) return;
+        state.index = nextIndex;
+        const url = new URL(window.location.href); url.searchParams.set('student', current().OrgDefinedId); history.pushState({}, '', url);
+        const wait = state.mode === 'slow-navigation' ? 900 : 0;
+        state.busy = true; app.setAttribute('aria-busy', 'true'); loading.hidden = false; updateIdentity(current());
+        if (wait) await new Promise(resolve => setTimeout(resolve, wait));
+        await renderStudent();
+      }
+      previous.addEventListener('click', () => navigate(-1));
+      next.addEventListener('click', () => navigate(1));
+      window.addEventListener('popstate', () => {
+        const id = query().get('student'); const found = state.students.findIndex(student => student.OrgDefinedId === id);
+        if (found >= 0) { state.index = found; renderStudent(); }
+      });
+      document.getElementById('save-draft')?.addEventListener('click', async () => {
+        clearNotices();
+        const student = current();
+        const payload = {student: student.student, OrgDefinedId: student.OrgDefinedId, score: grade.value, feedbackHtml: overallFeedback.html, mode: state.mode};
+        try {
+          const response = await fetch('/api/drafts', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(payload)});
+          const result = await response.json();
+          if (result.acknowledged) notice('Draft saved');
+          else if (!response.ok) notice('Save rejected: ' + (result.error || 'unknown fixture error'), 'alert');
+          else notice('Save request sent; native acknowledgment withheld.');
+        } catch (error) { notice('Save failed: ' + error.message, 'alert'); }
+      });
+
+      async function bootstrap() {
+        const response = await fetch('/api/roster', {cache: 'no-store'});
+        if (!response.ok) throw new Error('Roster read failed with HTTP ' + response.status + '.');
+        state.students = (await response.json()).students;
+        const requested = query().get('student');
+        const found = state.students.findIndex(student => student.OrgDefinedId === requested);
+        state.index = found >= 0 ? found : 0;
+        configureMode();
+        await renderStudent();
+        window.__fixtureDataReady = true;
+        const script = document.createElement('script'); script.src = '/userscript.js'; script.async = false; document.body.append(script);
+      }
+      bootstrap().catch(error => { loading.hidden = true; notice('Fixture bootstrap failed: ' + error.message, 'alert'); });
+    })();
+  </script>
+</body>
+</html>

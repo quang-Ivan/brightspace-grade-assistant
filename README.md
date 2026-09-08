@@ -1,77 +1,92 @@
-# 🎓 Brightspace (D2L) Feedback & Grade Auto-Assistant
+# 🎓 Brightspace (D2L) CSV Grade & Feedback Auto-Filler
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.0.0-brightgreen.svg)](brightspace_auto_feedback_injector.user.js)
-[![Userscript](https://img.shields.io/badge/Userscript-Tampermonkey%20%7C%20Violentmonkey-green.svg)](brightspace_auto_feedback_injector.user.js)
-[![Privacy: 100% Local](https://img.shields.io/badge/Privacy-100%25%20Local-brightgreen.svg)](#-privacy--local-execution)
+[![Version](https://img.shields.io/badge/Version-1.0.3-brightgreen.svg)](brightspace_auto_feedback_injector.user.js)
+[![Userscript](https://img.shields.io/badge/Userscript-Violentmonkey%20%7C%20Tampermonkey-green.svg)](brightspace_auto_feedback_injector.user.js)
+[![Privacy: No Tracking](https://img.shields.io/badge/Privacy-No%20Tracking-brightgreen.svg)](#-privacy--local-execution)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-orange.svg)](CONTRIBUTING.md)
 
-> A blazing-fast client-side userscript for instructors, professors, and Teaching Assistants (TAs). Automatically injects grades and rich rubric feedback into **D2L Brightspace Consistent Evaluation**, auto-confirms navigation dialogs, fast-skips already evaluated students, and cruises through the entire class roster with **reconciled class coverage**.
+> **Stop copy-pasting grades and feedback into Brightspace.** Built for Teaching Assistants (TAs) working through assignment queues, lab reports, and autograder results. Bring your reviewed scores and personalized comments from CSV into **D2L Brightspace Consistent Evaluation**. Instructors are welcome too.
+
+Free and open-source, with no tracking or third-party uploads. One script, no programming required. Install it with Violentmonkey or Tampermonkey—no Node, npm, or test files needed.
+
+[**Get the script**](#step-2-install-this-userscript) · [**Project homepage & video**](https://quang-Ivan.github.io/brightspace-grade-assistant/#demo) · [**User guide**](docs/USER_GUIDE.md)
+
+## 🎬 See it in action
+
+[![The CSV helper filling fictional students' grades and personalized feedback in an anonymized copy of Brightspace's evaluation page](assets/demo/quick-demo.gif)](https://quang-Ivan.github.io/brightspace-grade-assistant/#demo)
+
+[Watch the captioned video](https://quang-Ivan.github.io/brightspace-grade-assistant/#demo) · [Download the MP4](assets/demo/quick-demo.mp4)
+
+Load a CSV → fill the current student's grade and feedback → move to the next student. Recorded with the real script on an **anonymized local copy of Brightspace's evaluation-page HTML**, using fictional students and grading data. It demonstrates field entry, not a live save or a speed benchmark.
 
 ---
 
-## ⚡ 60-Second Quick Start
+## ⚡ Quick Start
 
-```
-+---------------------------+       +-------------------------------+       +------------------------------------+
-| 1. Install Extension      | ----> | 2. Install Script (1 Click)   | ----> | 3. Grade in Brightspace            |
-| Violentmonkey/Tampermonkey|       | Open raw .user.js in browser  |       | Load CSV & Press Alt+A (Auto-Cruise|
-+---------------------------+       +-------------------------------+       +------------------------------------+
-```
+**Install an extension → Install this script → Load your CSV in Brightspace**
 
 ### Step 1: Install a Userscript Manager (One-Time Setup)
-Install one of the recommended open-source browser extensions:
-- [**Violentmonkey**](https://violentmonkey.github.io/) (Recommended — fast, lightweight, and works seamlessly)
+
+Install one browser extension to run userscripts:
+
+- [**Violentmonkey**](https://violentmonkey.github.io/) (Recommended — open-source and lightweight)
 - [**Tampermonkey**](https://www.tampermonkey.net/) (Popular alternative)
 
 > [!NOTE]
-> **Chrome 138+ / Tampermonkey 5.3+ Notice**: In Chromium-based browsers, ensure **"Developer mode"** is enabled in `chrome://extensions` or toggle on **"Allow User Scripts"** in the extension details page so userscripts are permitted to run. Violentmonkey handles this automatically.
+> **Chrome 138+ / Tampermonkey 5.3+ Notice**: In Chromium-based browsers, ensure **"Developer mode"** is enabled in `chrome://extensions` or toggle on **"Allow User Scripts"** in the extension details page so userscripts are permitted to run. See the [permission walkthrough](docs/USER_GUIDE.md#1-install-a-userscript-manager).
 
 ### Step 2: Install This Userscript
-Click the 1-click install link below:
 
-👉 [**⚡ Click Here to Install Userscript (v1.0.0)**](https://raw.githubusercontent.com/quang-Ivan/brightspace-grade-assistant/main/brightspace_auto_feedback_injector.user.js)
+**Greasy Fork will be the main installation source.** Once the listing is available, open it, click **Install this script**, then confirm **Install** in your extension.
 
-*(Your extension manager will automatically open a tab asking you to confirm. Click **Install** or **Confirm**).*
+<!-- GREASY_FORK_URL: Replace the pending-listing line below with the actual script listing after publication. -->
+👉 **Greasy Fork listing: coming soon.**
+
+For now, use the [v1.0.3 source file](brightspace_auto_feedback_injector.user.js) and the [manual installation steps](docs/USER_GUIDE.md#2-install-this-script). Keep only one copy of the helper enabled.
 
 ### Step 3: Grade in Brightspace!
-1. Log into your university's Brightspace (e.g. Stony Brook, Purdue, Waterloo, or `*.brightspace.com`).
+
+1. Log into your university's Brightspace as a TA or instructor with assignment-grading permission.
 2. Go to your course ➔ **Assignments** ➔ Click on any student submission to enter **Consistent Evaluation**.
-3. The blue **🎓 Brightspace Feedback & Grade Assistant** panel appears in the bottom-right corner!
+3. The blue **🎓 Brightspace CSV Grade & Feedback Auto-Filler** panel appears in the bottom-right corner!
 4. Click **📁 Load Gradebook CSV** and select your CSV file.
-5. Click **🚀 Start Auto-Cruise** (or press <kbd>Alt</kbd> + <kbd>A</kbd>).
-6. When all students are graded, you will hear a cheerful 4-note completion chime 🎵.
+5. Check the student and preview. On your first run, try **Fill Current → Save Draft** on one unpublished submission and check the result after the page refreshes.
+6. Click **🚀 Start Full Class Auto-Cruise** (or press <kbd>Alt</kbd> + <kbd>A</kbd>). Use **Emergency Stop** whenever you need to pause.
+7. When the imported rows are accounted for, a 4-note completion chime plays 🎵. Review the draft, existing-match, and unsubmitted counts before publishing.
+
+> 📖 **First time using a userscript?** Follow the [step-by-step installation and user guide](docs/USER_GUIDE.md), including CSV preparation and troubleshooting.
 
 ---
 
 ## 💡 Key Architectural Clarifications
 
 ### 1. Does This Sync Directly to the Brightspace Gradebook?
-**Yes!** In Brightspace, whenever an assignment is linked to a Grade Item (the standard setup):
-- Saving an evaluation in the **Consistent Evaluation** interface automatically synchronizes the points into the **Brightspace Gradebook (`Grades`)**.
-- **You NO LONGER need to manually upload CSVs to the backend `Grades ➔ Import` page!** This script handles both rubric feedback injection and gradebook synchronization simultaneously through the GUI.
+
+The helper enters grades through the **assignment evaluation page**, not the Grades Import tool. If the assignment is linked to a Grade Item, Brightspace handles the connection to the Gradebook according to the course settings. Check the Grades page when confirming that setup; this script does not create or change the link.
 
 ### 2. Save Draft vs. Publish Workflow
+
 - For unreleased assignments, the script **strictly targets "Save Draft"** (it **never** clicks "Publish" on drafts).
-- Grades and feedback remain completely hidden in draft mode while grading is underway.
-- Once you finish and review the class, release all grades simultaneously with a single click using Brightspace's official **"Publish All"** button on the Submissions list.
-- *(Safety Notice: If an evaluation was already published to students previously, the script halts to prevent inadvertent live gradebook overwrites).*
+- After Brightspace confirms a draft save, the helper refreshes and checks the same student's score and feedback before moving on.
+- Once you finish reviewing, publish separately through Brightspace's own controls and check the intended student view.
+- For an already-published evaluation, the helper can **skip matching values**. If the grade or supplied feedback differs, it pauses; it never clicks **Update**.
 
 > 📖 **Want to know more about the underlying mechanics?**  
-> Read our comprehensive **[In-Depth Technical Guide & Architecture Manual](docs/IN_DEPTH_GUIDE.md)** for a deep-dive into Shadow DOM traversal, Siren/TinyMCE event synchronization, state machine flowcharts, and FERPA auditing.
+> Read the **[In-Depth Technical Guide](docs/IN_DEPTH_GUIDE.md)** for student matching, browser storage, and the save-and-refresh workflow.
 
 ---
 
 ## 🌟 Features at a Glance
 
-- 🔄 **Reconciled Full Roster Traversal**: Auto-rewinds to Student #1 before forward cruising, and wraps around if any students remain unvisited (up to 2 passes). Strictly reconciles completed vs. missing students before displaying completion.
-- 🎯 **Deep Web Component Piercing**: Targets `d2l-input-number` and TinyMCE iframe editors inside Brightspace Web Components while strictly isolating overall grades from rubric criteria.
-- 📝 **True Event Synchronization**: Dispatches proper `@d2l-htmleditor-blur` events to guarantee rich HTML overall feedback is permanently synchronized.
-- ⚡ **0.4s Fast Skip & Dialog Dismissal**: Already-graded students are skipped in 400ms (verifying non-empty feedback). Harmless navigation dialogs are safely intercepted; destructive dialogs (delete/discard) strictly halt for safety.
-- ⚠️ **Smart Skip & Validation**: Rejects invalid non-numeric scores, alerts on duplicate student names, and safely skips unsubmitted students.
-- 🛑 **Emergency Stop (<kbd>Alt</kbd> + <kbd>S</kbd>)**: Immediately cancels running tokens and invalidates all pending asynchronous promises in real time.
-- 🎵 **Web Audio Completion Chime**: Synthesizes a pleasant 4-note chime (C5-E5-G5-C6) when all grading is verified.
-- 🔒 **Privacy-First Local Architecture**: 100% client-side vanilla JavaScript. Zero telemetry, zero analytics, and no third-party network requests. Stored context is isolated per course and assignment.
+- 🔄 **Class Traversal & Progress**: Optionally rewinds to the first student, then moves forward while tracking your imported rows. A partial CSV or Brightspace filter does not silently become full-course coverage.
+- 🎯 **Focused Form Filling**: Fills only Overall Grade and Overall Feedback, leaving individual rubric scores and unrelated editors alone.
+- 📝 **Written Feedback with Line Breaks**: Copies ordinary text from your CSV, including multiline comments. No HTML formatting is required.
+- ⚡ **Fast Skip for Existing Matches**: Skips published or previously verified evaluations when the score and any supplied feedback match. Dialogs pause the run for your review.
+- ⚠️ **CSV Validation**: Rejects invalid scores and ambiguous identities. An empty score skips an unsubmitted student; **zero is a real grade**.
+- 🛑 **Emergency Stop (<kbd>Alt</kbd> + <kbd>S</kbd>)**: Stops further automated actions. It cannot undo an action Brightspace has already received.
+- 🎵 **Completion Chime**: Plays a pleasant 4-note chime when the imported rows are accounted for.
+- 🔒 **Privacy-First Local Execution**: Zero tracking, zero analytics, and no third-party uploads. The script operates Brightspace's fields and buttons rather than making its own network calls.
 
 ---
 
@@ -79,7 +94,8 @@ Click the 1-click install link below:
 
 The script natively accepts two CSV formats. A sample template is provided in [`sample_grades.csv`](sample_grades.csv).
 
-### 🎯 Quick Format Selection:
+### 🎯 Quick Format Selection
+
 | Your Goal | Recommended Format | Score Filled? | Feedback Injected? |
 | :--- | :---: | :---: | :---: |
 | **Inject Both Scores & Detailed Feedback** (Simplest) | **Format A** (`student,score,reason`) | ✅ Yes | ✅ Yes (Built-in `reason` column) |
@@ -89,19 +105,21 @@ The script natively accepts two CSV formats. A sample template is provided in [`
 ---
 
 ### Format A: Simple 3-Column CSV (Recommended)
+
 ```csv
 student,score,reason
 "Alice Smith",95.0,"Excellent work! Problem 1 and Problem 2 are completely correct."
 "Bob Jones",88.5,"Good submission. Note: check units and label all axes on problem 2."
 "Charlie Brown",,"No submission"
-"Diana Prince",92.0,"<p><b>Part A:</b> 50/50</p><p><b>Part B:</b> 42/50 (-8: calculation error)</p>"
+"Drew Example",92.0,"Part A: 50/50. Part B: 42/50. Please show the missing calculation."
 ```
+
 - **`student`**: Full name matching Brightspace (e.g. `First Last` or `Last, First`).
-- **`score`**: Numeric points. **For unsubmitted students, leave this completely blank!**
-- **`reason`**: Multi-line feedback comments or HTML tags.
+- **`score`**: Numeric points for your assignment, not a percentage or a fraction such as `7/8`. The examples above are out of 100. **For unsubmitted students, leave the score blank; use `0` for an actual zero.**
+- **`reason`**: Plaintext feedback, with CSV quoting for commas, quotes, or line breaks. Blank feedback leaves existing comments unchanged.
 
 > [!TIP]
-> **For best reliability, add an `OrgDefinedId` column to Format A** (e.g. `student,OrgDefinedId,score,reason`). When present, the script matches students by ID first, avoiding any name ambiguity.
+> You can add an **`OrgDefinedId`** column (e.g. `student,OrgDefinedId,score,reason`) using the values from your official course export. See the [student-ID guide](docs/IN_DEPTH_GUIDE.md#using-student-ids) if two students share a name.
 
 ---
 
@@ -117,14 +135,14 @@ OrgDefinedId,Last Name,First Name,Homework 1 Points Grade <Numeric MaxPoints:100
 ```
 
 > [!IMPORTANT]
-> **Strongly Recommended: Include `OrgDefinedId` in your CSV.**
-> - When `OrgDefinedId` is present in the CSV, the script uses it as the **primary key** for student matching, completely eliminating name ambiguity issues (e.g. two students with the same first and last name).
-> - If `OrgDefinedId` is not available or not found on the evaluation page, the script falls back to matching by `First Name` + `Last Name` as displayed in Brightspace.
+> Keep **one target grade column**, with its exact heading from the official export. The heading above is an example. Preserve OrgDefinedId values, including leading zeros.
+> An ID mismatch stops the run. If the page does not expose an ID, the student's displayed name must identify exactly one CSV row.
 
 > [!WARNING]
 > **Format B with `Feedback` is a Userscript-Specific Format**:
+>
 > - Adding a `Feedback` column is designed specifically for **this userscript**.
-> - Do **NOT** upload a CSV with a `Feedback` column directly to Brightspace's native `Grades ➔ Import` tool, because Brightspace's backend only accepts numeric grade item columns and will reject unknown text columns.
+> - Load this file in the helper panel, **not** Brightspace's native `Grades ➔ Import` tool. The two import formats serve different purposes.
 
 ---
 
@@ -134,6 +152,7 @@ OrgDefinedId,Last Name,First Name,Homework 1 Points Grade <Numeric MaxPoints:100
 <summary><strong>Click to expand 3 simple CSV preparation workflows</strong></summary>
 
 ### Workflow 1: From Brightspace Export (Zero Manual Typing of Names)
+
 1. In Brightspace, go to **Grades** ➔ **Enter Grades** ➔ **Export**.
 2. Under **Key Field**, select `OrgDefinedId` (or `Both`). Check `Last Name` and `First Name`.
 3. Under **Choose Grades to Export**, check your target Assignment (e.g. `Homework 1`).
@@ -141,13 +160,16 @@ OrgDefinedId,Last Name,First Name,Homework 1 Points Grade <Numeric MaxPoints:100
 5. Open in Excel, enter scores, add a `Feedback` column if desired, and save as CSV!
 
 ### Workflow 2: From Excel or Google Sheets (Quick 3-Column Spreadsheet)
+
 1. Open Excel or Google Sheets.
 2. Put `student`, `score`, and `reason` in the first row.
 3. Fill in student names, scores, and comments (leave unsubmitted scores blank).
-4. Save as CSV (`File ➔ Download / Save As ➔ CSV`).
+4. Save a **CSV UTF-8 (comma-delimited)** copy, not an `.xlsx` workbook.
 
 ### Workflow 3: Automated Python / Jupyter / Autograder Workflow
+
 TAs running autograders can export results directly:
+
 ```python
 import csv
 
@@ -172,9 +194,9 @@ with open("grades.csv", "w", newline="", encoding="utf-8") as f:
 | Shortcut | Action | Description |
 | :---: | :--- | :--- |
 | <kbd>Alt</kbd> + <kbd>A</kbd> | **Toggle Auto-Cruise** | Starts continuous automated grading or pauses execution |
-| <kbd>Alt</kbd> + <kbd>S</kbd> | **Emergency Stop** | Instantly halts all cruise timers, DOM clicks, and navigation |
+| <kbd>Alt</kbd> + <kbd>S</kbd> | **Emergency Stop** | Stops further automated actions |
 | <kbd>Alt</kbd> + <kbd>H</kbd> | **Rewind to First** | Rapidly navigates backwards to Student #1 |
-| <kbd>Alt</kbd> + <kbd>F</kbd> | **Fill Current Student** | Fills current score & feedback without saving or advancing |
+| <kbd>Alt</kbd> + <kbd>F</kbd> | **Fill Current Student** | Fills the fields without clicking Save Draft or advancing |
 | <kbd>Alt</kbd> + <kbd>→</kbd> | **Next Student** | Deep-clicks the Brightspace Next Student button |
 | <kbd>Alt</kbd> + <kbd>←</kbd> | **Previous Student** | Deep-clicks the Brightspace Previous Student button |
 
@@ -183,24 +205,49 @@ with open("grades.csv", "w", newline="", encoding="utf-8") as f:
 ## ❓ Frequently Asked Questions (FAQ)
 
 <details>
+<summary><strong>Q: How do I import grades and personalized feedback from CSV into Brightspace?</strong></summary>
+Prepare a CSV with student names or IDs, one score column, and a <code>reason</code> or <code>Feedback</code> column. Load it in this helper on an assignment evaluation page, check the preview, then fill and verify one unpublished submission before running the rest. This fills the assignment's Overall Grade and Overall Feedback; it is separate from Brightspace's native Grades Import.
+</details>
+
+<details>
+<summary><strong>Q: Can TAs bulk enter assignment feedback in D2L?</strong></summary>
+Yes, if your TA account has permission to evaluate that assignment and the page uses supported controls. Each CSV row can contain its own comment. Use manual controls for a few students or Auto-Cruise for your reviewed rows; the helper does not grant extra permissions or publish results.
+</details>
+
+<details>
+<summary><strong>Q: Is this an AI grader?</strong></summary>
+No. You decide the scores and feedback. The helper handles repetitive data entry from a CSV exported by Excel, Google Sheets, Python, or an autograder whose results you have reviewed.
+</details>
+
+<details>
 <summary><strong>Q: Does this work on my university's Brightspace website?</strong></summary>
-Yes! The script matches all standard Brightspace domains including <code>*.brightspace.com</code>, <code>*.desire2learn.com</code>, Stony Brook University (<code>mycourses.stonybrook.edu</code>), Purdue, Waterloo, Arizona, and any custom institutional domain.
+The script recognizes Brightspace page paths on standard and custom school domains. It is designed for the English-language Consistent Evaluation layout. If a school uses different controls or wording, the helper may pause rather than fill the wrong field.
 </details>
 
 <details>
 <summary><strong>Q: Will Brightspace detect or ban this?</strong></summary>
-No. This is a client-side assistive script running locally in your browser. It interacts with the DOM exactly as a human instructor would (dispatching standard click and input events).
+It is an assistive script that fills and clicks the existing page, not a separate grading service. Use it within your institution's rules; the project cannot promise how every institution treats automation.
 </details>
 
 <details>
 <summary><strong>Q: What happens if a student did not submit their assignment?</strong></summary>
-The script automatically detects unsubmitted students (or empty scores in your CSV), highlights them on the panel in orange (<code>⚠️ [Unsubmitted]</code>), and smoothly advances to the next student without stopping.
+A blank score in your CSV marks an unsubmitted student to skip. A student missing from the CSV is different: Auto-Cruise pauses. For a submitted student you have not graded yet, leave the row out and use manual controls for the rows you are ready to process.
 </details>
 
 <details>
-<summary><strong>Q: How is student privacy protected (FERPA / GDPR considerations)?</strong></summary>
-The script runs 100% locally inside your browser session as client-side vanilla JavaScript. There are zero remote APIs, zero external CDNs, and zero analytics tracking. CSV parsing happens in memory via the HTML5 <code>FileReader</code> API. Local storage data is scoped strictly to the current course and assignment context, and can be completely purged at any time using the <strong>🔄 Reset Cache & CSV</strong> button.
+<summary><strong>Q: What if the evaluation is already published?</strong></summary>
+The helper never clicks Update. With fast skip enabled, matching grade and feedback are skipped; a mismatch pauses for your review. A just-filled entry is not treated as an existing saved match.
 </details>
+
+## 🔒 Privacy & Local Execution
+
+The script runs locally in your browser: **no direct network/API calls, no analytics, and no third-party uploads**. It fills fields and clicks controls; Brightspace handles communication with its own servers, as it does during manual grading.
+
+Your CSV and progress are stored under the school's website in your browser, separated by course and assignment. **Reset Cache** removes that helper data for the current assignment; it does not remove Brightspace grades. Keep real student data out of public issues, screenshots, and sample files.
+
+## ✅ Testing & Current Scope
+
+v1.0.3 has 34 automated regression checks, a simulated browser workload, and real Brightspace checks for filling, navigation, fast skip, and pausing on published mismatches. The complete **Save Draft → refresh → verify** path has been exercised in simulation; its real unpublished-evaluation check remains outstanding. See the [test results](docs/LOCAL_VALIDATION.md) for details.
 
 ---
 

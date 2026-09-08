@@ -22,9 +22,12 @@ jobs:
         run: |
           node -c brightspace_auto_feedback_injector.user.js
 
-      - name: Run Regression Unit Tests (CSV, Escaping, Validation)
+      - name: Install Local Test Dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Run Production DOM and Lifecycle Regression Tests
         run: |
-          node tests/userscript_unit_test.js
+          npm test
 
       - name: Verify Userscript Metadata Headers
         run: |

@@ -3,34 +3,39 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Brightspace Feedback & Grade Assistant | Automated D2L Grading Userscript</title>
+  <title>Brightspace (D2L) CSV Grade &amp; Feedback Auto-Filler</title>
   
   <!-- SEO & Social Meta Tags -->
-  <meta name="description" content="A blazing-fast client-side Tampermonkey/Violentmonkey userscript for instructors and TAs to auto-fill grades and rich rubric feedback into D2L Brightspace Consistent Evaluation with 100% roster coverage.">
-  <meta name="keywords" content="Brightspace auto grade script, D2L auto feedback, Tampermonkey Brightspace, Violentmonkey D2L, Brightspace consistent evaluation auto filler, teaching assistant grading tool">
+  <meta name="description" content="A free, open-source tool for teaching assistants to fill Brightspace (D2L) assignment grades and personalized feedback from CSV. No third-party uploads.">
   <meta name="author" content="quang-Ivan">
   <link rel="canonical" href="https://quang-Ivan.github.io/brightspace-grade-assistant/">
   
   <!-- Open Graph -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://quang-Ivan.github.io/brightspace-grade-assistant/">
-  <meta property="og:title" content="Brightspace Feedback & Grade Assistant | 1-Click D2L Grading Automation">
-  <meta property="og:description" content="Automate grading, rich rubric feedback injection, dialog dismissal, and forward navigation in D2L Brightspace. 100% client-side local execution.">
+  <meta property="og:title" content="Brightspace (D2L) CSV Grade &amp; Feedback Auto-Filler">
+  <meta property="og:description" content="Stop copy-pasting grades and feedback into Brightspace. A free, open-source CSV helper built for TAs; instructors are welcome too.">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Brightspace (D2L) CSV Grade &amp; Feedback Auto-Filler">
+  <meta name="twitter:description" content="A free CSV grade and personalized-feedback helper built for teaching assistants. No third-party uploads.">
 
   <!-- Structured Data JSON-LD -->
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    "name": "Brightspace Feedback & Grade Assistant",
-    "operatingSystem": "Web Browser (Chrome, Firefox, Safari, Edge, Brave)",
+    "name": "Brightspace (D2L) CSV Grade & Feedback Auto-Filler",
+    "operatingSystem": "Web browser with Violentmonkey or Tampermonkey",
     "applicationCategory": "EducationalApplication",
     "offers": {
       "@type": "Offer",
       "price": "0",
       "priceCurrency": "USD"
     },
-    "description": "A userscript that automates score and feedback injection into D2L Brightspace Consistent Evaluation with 100% roster coverage.",
+    "description": "A free userscript for teaching assistants to fill reviewed assignment grades and personalized feedback from CSV into Brightspace.",
+    "url": "https://quang-Ivan.github.io/brightspace-grade-assistant/",
+    "softwareVersion": "1.0.3",
+    "license": "https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/LICENSE",
     "author": {
       "@type": "Person",
       "name": "quang-Ivan",
@@ -47,7 +52,7 @@
       --gray-light: #f7fafc;
       --gray-border: #e2e8f0;
       --text: #2d3748;
-      --text-muted: #718096;
+      --text-muted: #526174;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -132,9 +137,21 @@
       margin: 0 auto;
       padding: 60px 20px;
     }
+    header .container { padding: 10px 0; }
+    h1 { max-width: 960px; margin-left: auto; margin-right: auto; }
+    .demo-section { padding-top: 36px; padding-bottom: 36px; }
+    .demo-section h2 { font-size: 1.8rem; margin-bottom: 8px; }
+    .demo-section > p { color: var(--text-muted); margin-bottom: 20px; }
+    .demo-frame { overflow: hidden; border: 1px solid var(--gray-border); border-radius: 12px; background: var(--gray-light); }
+    .demo-frame video { display: block; width: 100%; height: auto; aspect-ratio: 40 / 27; background: #eef5fc; }
+    figcaption { padding: 14px 18px; color: var(--text-muted); font-size: 14px; }
+    .demo-links { margin-top: 14px; font-size: 16px; }
+    a { color: #005b9c; }
+    a:focus-visible, summary:focus-visible { outline: 3px solid #d99000; outline-offset: 4px; }
+    .install-status { margin: 18px auto 0; font-size: 14px; }
     .grid-3 {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
       gap: 30px;
       margin-top: 40px;
     }
@@ -159,7 +176,7 @@
     }
     .card p {
       color: var(--text-muted);
-      font-size: 15px;
+      font-size: 16px;
     }
     .steps-section {
       background: #f8fafc;
@@ -247,66 +264,97 @@
       color: #63b3ed;
       text-decoration: none;
     }
+    @media (max-width: 600px) {
+      header { padding: 36px 18px; }
+      h1 { font-size: 2rem; }
+      .subtitle { font-size: 1.1rem; }
+      .container { padding: 36px 18px; }
+      .cta-group { gap: 10px; }
+      .btn { padding: 12px 18px; }
+      .grid-3 { gap: 18px; }
+      .card { padding: 22px; }
+      th, td { padding: 10px 8px; }
+    }
   </style>
 </head>
 <body>
 
   <header>
     <div class="container">
-      <div style="margin-bottom:16px;">
-        <span class="badge">🚀 v1.0.0 Release</span>
-        <span class="badge">🔒 100% Client-Side Privacy</span>
+      <div class="badge-bar" style="margin-bottom:16px;">
+        <span class="badge">🚀 v1.0.3</span>
+        <span class="badge">🔒 No Tracking or Third-Party Uploads</span>
         <span class="badge">⚖️ MIT Open Source</span>
       </div>
-      <h1>Brightspace Feedback & Grade Assistant</h1>
+      <p class="badge-bar">Built for teaching assistants · Instructors welcome</p>
+      <h1>Brightspace (D2L) CSV Grade &amp; Feedback Auto-Filler</h1>
       <p class="subtitle">
-        Automate grade entry and rich feedback injection into D2L Brightspace. Zero-miss roster traversal, fast skip for existing grades, and complete gradebook synchronization.
+        <strong>Stop copy-pasting grades and feedback into Brightspace.</strong><br>
+        Bring your reviewed scores and personalized comments from CSV. Free, open-source, and no third-party uploads.
       </p>
-      <div class="hero-actions">
-        <a href="https://raw.githubusercontent.com/quang-Ivan/brightspace-grade-assistant/main/brightspace_auto_feedback_injector.user.js" class="btn btn-install">
-          ⚡ 1-Click Install Script (v1.0.0)
+      <div class="cta-group">
+        <a href="#install" class="btn btn-install">
+          ⚡ Get the Script
+        </a>
+        <a href="#demo" class="btn btn-github">
+          ▶ Watch the Demo
         </a>
         <a href="https://github.com/quang-Ivan/brightspace-grade-assistant" class="btn btn-github">
           ⭐ View on GitHub
         </a>
-        <a href="https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/IN_DEPTH_GUIDE.md" class="btn btn-github">
-          📖 Technical Manual
+        <a href="https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/USER_GUIDE.md" class="btn btn-github">
+          📖 Step-by-Step Guide
         </a>
         <a href="sample_grades.csv" download class="btn btn-github">
           📥 Download Sample CSV
         </a>
       </div>
+      <p class="install-status">Greasy Fork listing coming soon. Source installation is available below.</p>
     </div>
   </header>
 
   <main>
+    <section class="container demo-section" id="demo" aria-labelledby="demo-title">
+      <h2 id="demo-title">From your CSV to each student's feedback</h2>
+      <p>Load your CSV → fill the current student's grade and feedback → move to the next student.</p>
+      <figure class="demo-frame">
+        <video controls playsinline preload="none" poster="assets/demo/quick-demo.png" aria-label="Brightspace CSV grade and feedback helper demonstration with fictional students">
+          <source src="assets/demo/quick-demo.mp4" type="video/mp4">
+          <track default kind="captions" src="assets/demo/quick-demo.vtt" srclang="en" label="English">
+          Your browser cannot play this video. <a href="assets/demo/quick-demo.mp4">Download the MP4 demonstration</a>.
+        </video>
+        <figcaption>Recorded with the real script on an <strong>anonymized local copy of Brightspace's evaluation-page HTML</strong>. All students and grading data are fictional. This demonstrates field entry, not a live Brightspace save or a speed benchmark.</figcaption>
+      </figure>
+      <p class="demo-links"><a href="#install">Get the script</a> · <a href="sample_grades.csv" download>Download a sample CSV</a> · <a href="https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/USER_GUIDE.md">Read the user guide</a></p>
+    </section>
     <div class="container">
-      <h2 style="text-align:center; font-size:2rem; margin-bottom:10px;">Why TAs & Instructors Love It</h2>
+      <h2 style="text-align:center; font-size:2rem; margin-bottom:10px;">You did the grading. Let the helper do the typing.</h2>
       <p style="text-align:center; color:var(--text-muted); max-width:680px; margin:0 auto;">
-        Grading each student manually on Brightspace takes 15–30 seconds. With automated cruise, each student evaluation draft is synchronized in ~3–4 seconds, reducing a 50-student section from ~25 minutes to ~3 minutes, while leaving you in full control to review before publishing.
+        Built for TAs working through assignment queues, lab reports, and autograder results. Prepare scores and comments in the tools you already use, then let the helper handle repetitive form entry. Instructors can use it too; you stay in control of grading and publication.
       </p>
 
       <div class="grid-3">
         <div class="card">
-          <h3>Zero-Miss Roster Coverage</h3>
+          <div class="card-icon">🔄</div>
+          <h3>Class Navigation & Progress</h3>
           <p>
-            Never worry about starting mid-list. When Auto-Cruise starts, it automatically rewinds backward to Student #1 before forward cruising, and wraps around at the end if any students remain unvisited.
+            Start from the current student or rewind to the beginning. Track newly verified drafts, matching existing evaluations, unsubmitted rows, and rows still remaining in your CSV.
           </p>
         </div>
 
         <div class="card">
           <div class="card-icon">📝</div>
-          <h3>True Event Synchronization</h3>
+          <h3>Grade & Feedback Together</h3>
           <p>
-            Pierces Shadow DOM and TinyMCE iframe editors with Brightspace Siren/Blur event synchronization (<code>d2l-htmleditor-blur</code>), guaranteeing rich HTML feedback is permanently saved to the server.
+            Fill Overall Grade and Overall Feedback from your spreadsheet, including multiline comments. Individual rubric scores and unrelated editors are left alone.
           </p>
         </div>
 
         <div class="card">
           <div class="card-icon">⚡</div>
-          <h3>0.4s Fast Skip & Dialog Dismissal</h3>
+          <h3>Fast Skip for Existing Matches</h3>
           <p>
-            Already graded students are skipped in 400ms (while verifying feedback is not blank). Unsaved changes dialogs are dynamically dismissed in 100ms without human intervention.
+            Skip published or previously verified evaluations when the grade and supplied feedback match. A difference or a confirmation dialog pauses the run for your review.
           </p>
         </div>
 
@@ -314,7 +362,7 @@
           <div class="card-icon">⚠️</div>
           <h3>Smart Unsubmitted Handling</h3>
           <p>
-            Students without homework submissions or missing scores are automatically recognized, alerted on screen, and smoothly skipped to the next student without stalling.
+            An empty score marks an unsubmitted row to skip. Zero is a real grade. Invalid scores, conflicting identities, and students missing from the file pause processing.
           </p>
         </div>
 
@@ -322,7 +370,7 @@
           <div class="card-icon">🔒</div>
           <h3>Privacy-First Architecture</h3>
           <p>
-            Zero cloud backend, zero telemetry, zero external network calls. All CSV data is read client-side and stored strictly in your browser origin local storage.
+            No tracking, analytics, direct network/API calls, or third-party uploads. The script operates Brightspace fields and buttons; Brightspace handles its own server communication.
           </p>
         </div>
 
@@ -330,14 +378,14 @@
           <div class="card-icon">🎵</div>
           <h3>Audio Completion Chime</h3>
           <p>
-            Synthesizes a pleasant 4-note chime (C5-E5-G5-C6) via the native Web Audio API when all students across the class are 100% graded.
+            A pleasant 4-note chime signals that the imported rows are accounted for. Review the progress counts and drafts before publishing results in Brightspace.
           </p>
         </div>
       </div>
     </div>
 
     <!-- 3-Step Quick Start -->
-    <section class="steps-section">
+    <section class="steps-section" id="install">
       <div class="container" style="padding:0;">
         <h2 style="text-align:center; font-size:2rem; margin-bottom:40px;">How It Works: 3 Simple Steps</h2>
 
@@ -346,7 +394,7 @@
           <div class="step-content">
             <h4>Install a Userscript Extension</h4>
             <p>
-              Install <a href="https://violentmonkey.github.io/" target="_blank"><strong>Violentmonkey</strong></a> (recommended) or <a href="https://www.tampermonkey.net/" target="_blank"><strong>Tampermonkey</strong></a> in your browser (Chrome, Edge, Firefox, Safari, Brave).
+              Install <a href="https://violentmonkey.github.io/" target="_blank" rel="noopener"><strong>Violentmonkey</strong></a> (recommended) or <a href="https://www.tampermonkey.net/" target="_blank" rel="noopener"><strong>Tampermonkey</strong></a> (alternative). Follow the extension prompts to permit userscripts in your browser.
             </p>
           </div>
         </div>
@@ -356,7 +404,8 @@
           <div class="step-content">
             <h4>Install the Userscript</h4>
             <p>
-              Click <a href="https://raw.githubusercontent.com/quang-Ivan/brightspace-grade-assistant/main/brightspace_auto_feedback_injector.user.js"><strong>1-Click Install Script</strong></a>. Your extension manager will open and ask you to confirm. Click <em>Install</em>.
+              <!-- GREASY_FORK_URL: Replace this pending-listing text with the actual Greasy Fork listing after publication. -->
+              <strong>Greasy Fork listing: coming soon.</strong> Once available, click <strong>Install this script</strong> on its page and confirm <strong>Install</strong> in your extension. For now, use the <a href="brightspace_auto_feedback_injector.user.js">source file</a> with the <a href="https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/USER_GUIDE.md#2-install-this-script">manual installation steps</a>.
             </p>
           </div>
         </div>
@@ -366,7 +415,7 @@
           <div class="step-content">
             <h4>Open Brightspace & Start Cruising</h4>
             <p>
-              Open any student submission evaluation page in Brightspace. The blue assistant panel appears in the bottom right corner. Click <strong>📁 Load Gradebook CSV</strong>, pick your file, and click <strong>🚀 Start Auto-Cruise</strong> (or press <code>Alt + A</code>)!
+              Open one student's assignment evaluation, not the class list. Use <strong>📁 Load Gradebook CSV</strong> and check the preview. Verify one unpublished submission with <strong>Fill Current → Save Draft</strong> before starting <strong>🚀 Auto-Cruise</strong> (or <code>Alt + A</code>).
             </p>
           </div>
         </div>
@@ -377,7 +426,7 @@
     <div class="container" style="padding-top:20px;">
       <h2 style="font-size:2rem; margin-bottom:12px;">Why Start with a CSV File?</h2>
       <p style="color:var(--text-muted); margin-bottom:30px;">
-        Traditional grading forces you to evaluate work and enter data into the LMS at the same time. This userscript decouples the two: you grade offline in your favorite environment (Excel, Google Sheets, Python autograders, or AI grading tools), and the userscript handles 100% of the Brightspace form entry, feedback injection, and navigation automatically.
+        Keep reviewing work and entering it into the LMS as separate steps. Prepare grades and feedback in Excel, Google Sheets, or your autograder, then import a CSV copy for the helper to enter through Brightspace's normal interface.
       </p>
 
       <div class="grid-3" style="margin-top:0; margin-bottom:40px;">
@@ -385,14 +434,14 @@
           <div class="card-icon">📊</div>
           <h3>Workflow 1: Brightspace Export</h3>
           <p>
-            Go to <em>Grades ➔ Export</em> in Brightspace, select <strong>OrgDefinedId</strong> (Student ID) and Name fields, and download the roster CSV. Zero manual typing of student names!
+            Export <strong>OrgDefinedId</strong>, first and last names, and only the target grade item from Brightspace Grades. Keep the exact exported column heading and ID values.
           </p>
         </div>
         <div class="card">
           <div class="card-icon">📑</div>
           <h3>Workflow 2: Excel / Google Sheets</h3>
           <p>
-            Create a simple 3-column sheet (<code>student</code>, <code>score</code>, <code>reason</code>). Leave unsubmitted students blank and export to CSV.
+            Create a three-column sheet: <code>student</code>, <code>score</code>, <code>reason</code>. Leave only unsubmitted scores blank, then save a CSV UTF-8 copy.
           </p>
         </div>
         <div class="card">
@@ -404,11 +453,13 @@
         </div>
       </div>
 
+    </div>
+
     <!-- CSV Format & Cheatsheet -->
     <div class="container" style="padding-top:0;">
       <h2 style="font-size:1.8rem; margin-bottom:16px;">Supported CSV Formats</h2>
       <p style="color:var(--text-muted); margin-bottom:16px;">
-        Both formats can inject scores and overall feedback. Pick the one that fits your workflow:
+        Both formats can fill scores and overall feedback. These fictional examples are out of 100; use the correct points for your assignment. Feedback is ordinary text, not HTML.
       </p>
 
       <h3 style="font-size:1.2rem; margin-bottom:8px; color:var(--dark);">Format A: Simple 3-Column CSV (Recommended for Scores + Feedback)</h3>
@@ -419,14 +470,14 @@
 
       <h3 style="font-size:1.2rem; margin-top:24px; margin-bottom:8px; color:var(--dark);">Format B: Brightspace Export (With Optional Feedback Column)</h3>
       <p style="color:var(--text-muted); font-size:14px; margin-bottom:8px;">
-        If you exported your roster from Brightspace, you can add a <code>Feedback</code> column to inject both scores and feedback simultaneously into this userscript:
+        If you exported your roster from Brightspace, keep one grade column and optionally add <code>Feedback</code>. A blank feedback cell leaves existing feedback unchanged. Use the exact grade heading from your export:
       </p>
       <pre><code>OrgDefinedId,Last Name,First Name,Homework 1 Points Grade &lt;Numeric MaxPoints:100&gt;,Feedback,End-of-Line Indicator
 #112233445,Smith,Alice,95.0,"Excellent work! All answers completely correct.",#
 #112233446,Jones,Bob,88.5,"Good job. Note: check units on problem 2.",#
 #112233447,Brown,Charlie,,No submission,#</code></pre>
       <p style="background:#fff3cd; border-left:4px solid #ffc107; padding:10px 14px; font-size:13px; color:#856404; border-radius:4px; margin-top:8px;">
-        <strong>Note:</strong> Format B with a <code>Feedback</code> column is designed specifically for this userscript. Do not upload it to Brightspace's native Gradebook Import (<em>Grades ➔ Import</em>), which only accepts pure numeric columns.
+        <strong>Note:</strong> Load this file through the helper panel, not Brightspace's <em>Grades ➔ Import</em>. For same-name students, see the <a href="https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/IN_DEPTH_GUIDE.md#using-student-ids">student-ID instructions</a>.
       </p>
 
       <h2 style="font-size:1.8rem; margin-top:50px; margin-bottom:16px;">Keyboard Shortcuts</h2>
@@ -447,7 +498,7 @@
           <tr>
             <td><code>Alt + S</code></td>
             <td><strong>Emergency Stop</strong></td>
-            <td>Immediately terminates all cruise timers, DOM clicks, and navigation</td>
+            <td>Stops further automated actions; does not undo requests already sent</td>
           </tr>
           <tr>
             <td><code>Alt + H</code></td>
@@ -457,7 +508,7 @@
           <tr>
             <td><code>Alt + F</code></td>
             <td><strong>Fill Current</strong></td>
-            <td>Fills grade and feedback for the current student without saving</td>
+            <td>Fills grade and feedback without clicking Save Draft or navigating</td>
           </tr>
           <tr>
             <td><code>Alt + →</code></td>
@@ -475,32 +526,56 @@
       <!-- FAQ Section -->
       <h2 style="font-size:1.8rem; margin-top:50px; margin-bottom:20px;">Frequently Asked Questions (FAQ)</h2>
 
+      <details class="faq-item">
+        <summary class="faq-question">How do I import grades and feedback from CSV into Brightspace?</summary>
+        <p class="faq-answer">Install the helper, open an individual assignment evaluation, and load a CSV with student names or IDs, scores, and written feedback. Check the preview and verify one unpublished submission first. The helper fills Overall Grade and Overall Feedback through the evaluation page; it is separate from Brightspace's native Grades Import tool.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-question">Can TAs bulk enter assignment feedback in D2L?</summary>
+        <p class="faq-answer">Yes, with permission to evaluate the assignment and supported page controls. Each CSV row can carry a different student's personalized comment. Use manual controls for a few entries or Auto-Cruise for your reviewed rows. The helper does not grant extra permissions or publish results.</p>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-question">Does this work with Excel, Google Sheets, or autograder results?</summary>
+        <p class="faq-answer">Yes. Save reviewed results as a CSV UTF-8 file with the supported columns, then load it in the helper. You still decide the scores and feedback: this is a data-entry helper, not an AI grader.</p>
+      </details>
+
       <div class="faq-item">
         <div class="faq-question">Does this work with my university's Brightspace domain?</div>
         <div class="faq-answer">
-          Yes! The script includes universal URL match rules covering <code>*.brightspace.com</code>, <code>*.desire2learn.com</code>, Stony Brook, Purdue, Waterloo, and all custom institutional Brightspace domains.
+          It recognizes Brightspace page paths on standard and custom school domains. It is designed for the English-language Consistent Evaluation layout; an unfamiliar layout may pause the helper.
         </div>
       </div>
 
       <div class="faq-item">
         <div class="faq-question">Will students see feedback immediately?</div>
         <div class="faq-answer">
-          For new assignments, the script clicks "Save Draft", keeping grades hidden until you release them via Brightspace's official "Publish All" button. (Note: if an assignment was already published, clicking "Update" will update published grades).
+          The helper clicks Save Draft, not Publish or Update. Review drafts and publish separately through Brightspace. Check the course's Grades configuration and the student view when confirming what has been released.
         </div>
       </div>
 
       <div class="faq-item">
         <div class="faq-question">How is student privacy protected (FERPA / GDPR considerations)?</div>
         <div class="faq-answer">
-          The script has zero telemetry, zero analytics, and zero remote network calls. All grading data is processed locally inside your browser and stored in your browser origin storage scoped per assignment.
+          The script has no direct network/API calls, tracking, or third-party uploads. It interacts with the Brightspace page, which handles sending grades. Imported CSV data and progress stay in browser storage under your school's website. Reset Cache clears the helper's current-assignment data, not Brightspace grades.
         </div>
       </div>
+      <div class="faq-item">
+        <div class="faq-question">What happens to already-published evaluations?</div>
+        <div class="faq-answer">With fast skip enabled, matching grades and feedback are skipped. A mismatch pauses the helper; it does not click Update. An unsaved fill is not treated as an existing match.</div>
+      </div>
+      <p style="margin-top:24px; color:var(--text-muted); font-size:14px;">
+        <strong>Testing:</strong> v1.0.3 includes automated regression checks, a simulated browser workload, and real Brightspace checks for filling, navigation, and fast skip. The Save Draft and refresh workflow still needs its real unpublished-evaluation check.
+        <a href="https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/LOCAL_VALIDATION.md">See the testing details</a>.
+      </p>
     </div>
   </main>
 
   <footer>
+    <p style="margin-bottom:16px;"><a href="#install">Get the script</a> · <a href="#demo">Watch the demo</a> · <a href="https://github.com/quang-Ivan/brightspace-grade-assistant">Source on GitHub</a> · <a href="https://github.com/quang-Ivan/brightspace-grade-assistant/issues">Report an issue</a></p>
     <p>
-      Created by <a href="https://github.com/quang-Ivan" target="_blank">quang-Ivan</a> | Released under the <a href="https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/LICENSE" target="_blank">MIT License</a>
+      Created by <a href="https://github.com/quang-Ivan" target="_blank" rel="noopener">quang-Ivan</a> | Released under the <a href="https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/LICENSE" target="_blank" rel="noopener">MIT License</a>
     </p>
     <p style="margin-top:8px; font-size:12px; opacity:0.7;">
       Not affiliated with or endorsed by D2L Corporation. Brightspace is a registered trademark of D2L Corporation.

@@ -1,0 +1,8 @@
+student,OrgDefinedId,score,reason
+Alice Smith,001,92,"Uses < and > & ""quotes"".
+Second line stays plaintext."
+Alex Smith,002,0,"Zero is intentional; keep the <check> &amp; marker as text."
+Alex Smith,003,88,"Clear work on the main derivation."
+Bob Jones,004,74,"Good structure; revisit the final example."
+Charlie Brown,005,,"Explicitly unsubmitted: no score should be written."
+Dana Lee,006,100,"Excellent submission."

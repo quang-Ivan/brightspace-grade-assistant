@@ -1,21 +1,13 @@
 // ==UserScript==
-// @name         Brightspace (D2L) Assignment Feedback & Grade Auto-Filler
+// @name         Brightspace (D2L) CSV Grade & Feedback Auto-Filler
 // @namespace    https://github.com/quang-Ivan/brightspace-grade-assistant
-// @version      1.0.0
-// @description  Deep Shadow-DOM & TinyMCE Piercer for D2L Brightspace. Auto-rewinds to roster start, fills grades and rich feedback, syncs true blur/Siren events, fast skips graded students, dismisses dialogs, and auto-navigates. 100% client-side local execution.
+// @version      1.0.3
+// @description  A time-saving tool for TAs: fill Brightspace assignment grades and personalized feedback from CSV. Free, open-source, and no third-party uploads.
 // @author       quang-Ivan
 // @license      MIT
-// @homepageURL  https://github.com/quang-Ivan/brightspace-grade-assistant
-// @supportURL   https://github.com/quang-Ivan/brightspace-grade-assistant/issues
 // @match        *://*/d2l/*
 // @match        *://*/*activities/iterator/*
-// @match        *://*/d2l/lms/dropbox/admin/mark/*
-// @match        *://*/d2l/le/activities/iterator/*
-// @match        https://mycourses.stonybrook.edu/d2l/*
-// @match        https://*.brightspace.com/d2l/*
-// @match        https://*.desire2learn.com/d2l/*
 // @run-at       document-idle
-// @all-frames   true
 // @grant        none
 // ==/UserScript==
 
@@ -23,961 +15,915 @@
     'use strict';
 
     const IS_TOP = window.self === window.top;
-
-    // Sample fallback database (Zero student private data - 100% FERPA Compliant)
-    const SAMPLE_STUDENT_DB = {
-        "Sample Student A": { "score": "100.0", "reason": "Excellent work! All problems completed thoroughly and accurately.", "submitted": true },
-        "Sample Student B": { "score": "85.0", "reason": "Good effort. Note for improvement: check units and label all axes on problem 2.", "submitted": true },
-        "Sample Student C": { "score": null, "reason": "No submission", "submitted": false }
-    };
-
-    let isHalted = false;
+    const SCHEMA_VERSION = 2;
+    const PENDING_KEY = 'd2l_pending_draft_readback_v2';
+    const READBACK_TTL = 120000;
+    const PAGE_INSTANCE = makeRevision();
     let activeRunToken = 0;
-    let autoCruiseActive = false;
-    let isProcessingCurrent = false;
-    let currentProcessingStudent = null;
-    let cruiseInterval = null;
-    let wrapAroundPasses = 0;
-    const processedSet = new Set();
+    let activeOperation = null;
+    let isHalted = true;
+    let restoreStarted = false;
+    let locallyEditedTarget = null;
 
+    function makeRevision() {
+        return typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID() : Date.now() + '-' + Math.random().toString(36).slice(2);
+    }
+
+    // Retain the existing query/path repair; unknown/duplicate scope must not share a cache.
     function getAssignmentContextKey() {
-        const ouMatch = window.location.search.match(/ou=(\d+)/);
-        const ou = ouMatch ? ouMatch[1] : 'unknown_course';
-        const iterMatch = window.location.pathname.match(/iterator\/(\d+)/);
-        const iter = iterMatch ? iterMatch[1] : 'unknown_iter';
-        return `ou${ou}_assign${iter}`;
-    }
-
-    function getAssignmentId() {
-        return getAssignmentContextKey();
-    }
-
-    function getProcessedMap() {
         try {
-            const id = getAssignmentId();
-            const raw = localStorage.getItem(`d2l_processed_map_${id}`);
-            return raw ? JSON.parse(raw) : {};
-        } catch(e) {
-            return {};
-        }
-    }
-
-    function markStudentProcessed(name, details = {}) {
-        try {
-            const id = getAssignmentId();
-            const map = getProcessedMap();
-            map[name] = {
-                timestamp: Date.now(),
-                ...details
+            const url = new URL(window.location.href);
+            const one = key => {
+                const values = url.searchParams.getAll(key);
+                if (values.length > 1) throw new Error('Duplicate context parameter');
+                return values[0] || null;
             };
-            localStorage.setItem(`d2l_processed_map_${id}`, JSON.stringify(map));
-        } catch(e) {}
+            const ou = one('ou');
+            const ids = ['iteratorId', 'db', 'folderId'].map(one).filter(Boolean);
+            if (new Set(ids).size > 1) return null;
+            const path = url.pathname.match(/iterator\/(\d+)(?:\/|$)/);
+            const iter = ids[0] || (path ? path[1] : null);
+            if (!ou || !iter || !/^\d+$/.test(ou) || !/^\d+$/.test(iter)) return null;
+            return 'ou' + ou + '_assign' + iter;
+        } catch (_) { return null; }
     }
 
-    function clearProcessedMap() {
+    function readGradebook() {
+        const ctx = getAssignmentContextKey();
+        if (!ctx) return null;
         try {
-            const id = getAssignmentId();
-            localStorage.removeItem(`d2l_processed_map_${id}`);
-        } catch(e) {}
-    }
-
-    function getSkipProcessedPref() {
-        try {
-            const pref = localStorage.getItem('d2l_skip_processed_pref');
-            return pref === null ? true : pref === 'true';
-        } catch(e) {
-            return true;
-        }
-    }
-
-    function setSkipProcessedPref(val) {
-        try {
-            localStorage.setItem('d2l_skip_processed_pref', val ? 'true' : 'false');
-        } catch(e) {}
-    }
-
-    function getAutoRewindPref() {
-        try {
-            const pref = localStorage.getItem('d2l_auto_rewind_pref');
-            return pref === null ? true : pref === 'true';
-        } catch(e) {
-            return true;
-        }
-    }
-
-    function setAutoRewindPref(val) {
-        try {
-            localStorage.setItem('d2l_auto_rewind_pref', val ? 'true' : 'false');
-        } catch(e) {}
-    }
-
-    function getStudentDatabase() {
-        try {
-            const key = `d2l_auto_eval_db_${getAssignmentContextKey()}`;
-            const saved = localStorage.getItem(key);
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                if (Object.keys(parsed).length > 0) return parsed;
-            }
-        } catch(e) {}
-        return SAMPLE_STUDENT_DB;
-    }
-
-    function saveStudentDatabase(db) {
-        const key = `d2l_auto_eval_db_${getAssignmentContextKey()}`;
-        localStorage.setItem(key, JSON.stringify(db));
-    }
-
-    function clearAllAssignmentData() {
-        try {
-            const ctx = getAssignmentContextKey();
-            localStorage.removeItem(`d2l_auto_eval_db_${ctx}`);
-            localStorage.removeItem(`d2l_processed_map_${ctx}`);
-            processedSet.clear();
-        } catch(e) {}
-    }
-
-    function findStudentData(studentName, db, studentOrgId = null) {
-        if (!db) return null;
-
-        // 1. Primary Key: Prioritize OrgDefinedId if present on page
-        if (studentOrgId) {
-            const cleanOrgId = String(studentOrgId).trim().toLowerCase();
-            for (const [key, val] of Object.entries(db)) {
-                if (val && val.orgId && String(val.orgId).trim().toLowerCase() === cleanOrgId) {
-                    console.log(`[D2L-AutoFeedback] Authoritatively matched student by OrgDefinedId "${studentOrgId}":`, key);
-                    return val;
-                }
-            }
-        }
-
-        // 2. Secondary: Fall back to student name
-        if (!studentName) return null;
-        if (db[studentName]) return db[studentName];
-        
-        const clean = studentName.trim().toLowerCase();
-        const matches = [];
-        for (const [key, val] of Object.entries(db)) {
-            const candidateName = (val && val.name) ? val.name : key;
-            if (candidateName.trim().toLowerCase() === clean || key.trim().toLowerCase() === clean) {
-                matches.push({ name: key, data: val });
-                continue;
-            }
-            
-            // Handle "First Last" vs "Last, First"
-            const parts = candidateName.split(/[\s,]+/).filter(Boolean);
-            if (parts.length === 2) {
-                const rev = `${parts[1]} ${parts[0]}`.toLowerCase();
-                if (rev === clean) {
-                    matches.push({ name: key, data: val });
-                }
-            }
-        }
-        if (matches.length === 1) return matches[0].data;
-        if (matches.length > 1) {
-            console.error(`[D2L-AutoFeedback] Ambiguity: multiple CSV records match "${studentName}":`, matches);
-            return { ambiguous: true, matches };
-        }
+            const value = JSON.parse(localStorage.getItem('d2l_auto_eval_db_' + ctx));
+            if (value && value.schemaVersion === SCHEMA_VERSION && typeof value.revision === 'string' &&
+                value.students && typeof value.students === 'object' && !Array.isArray(value.students)) return value;
+        } catch (_) {}
         return null;
     }
 
-    function sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+    function getStudentDatabase() {
+        return readGradebook()?.students || {};
+    }
+
+    function getDatabaseRevision() {
+        return readGradebook()?.revision || null;
+    }
+
+    function saveStudentDatabase(students) {
+        const ctx = getAssignmentContextKey();
+        if (!ctx) throw new Error('Course/assignment context is not identified.');
+        const value = {schemaVersion: SCHEMA_VERSION, revision: makeRevision(), students};
+        localStorage.setItem('d2l_auto_eval_db_' + ctx, JSON.stringify(value));
+        return value;
+    }
+
+    function getProcessedMap() {
+        const ctx = getAssignmentContextKey();
+        const revision = getDatabaseRevision();
+        if (!ctx || !revision) return {};
+        try {
+            const value = JSON.parse(localStorage.getItem('d2l_processed_map_' + ctx));
+            return value && value.schemaVersion === SCHEMA_VERSION && value.revision === revision
+                ? value.records || {} : {};
+        } catch (_) { return {}; }
+    }
+
+    function recordFingerprint(data) {
+        return JSON.stringify([data.score, data.reason || '', data.submitted]);
+    }
+
+    function markStudentProcessed(key, details) {
+        const db = getStudentDatabase();
+        if (!Object.hasOwn(db, key)) throw new Error('Cannot record a student outside this CSV.');
+        const records = getProcessedMap();
+        records[key] = {...details, fingerprint: recordFingerprint(db[key]), timestamp: Date.now()};
+        localStorage.setItem('d2l_processed_map_' + getAssignmentContextKey(), JSON.stringify({
+            schemaVersion: SCHEMA_VERSION, revision: getDatabaseRevision(), records
+        }));
+    }
+
+    function clearProcessedMap() {
+        const ctx = getAssignmentContextKey();
+        if (ctx) localStorage.removeItem('d2l_processed_map_' + ctx);
+    }
+
+    function clearAllAssignmentData() {
+        stopCruise('Assignment cache cleared.');
+        const ctx = getAssignmentContextKey();
+        if (ctx) {
+            localStorage.removeItem('d2l_auto_eval_db_' + ctx);
+            localStorage.removeItem('d2l_processed_map_' + ctx);
+        }
+        for (const key of ['d2l_auto_eval_db_public', 'd2l_evaluation_map_public', 'd2l_processed_students_public']) {
+            localStorage.removeItem(key);
+        }
+    }
+
+    function getPreference(key, fallback = true) {
+        try { const value = localStorage.getItem(key); return value === null ? fallback : value === 'true'; }
+        catch (_) { return fallback; }
+    }
+    function getSkipProcessedPref() { return getPreference('d2l_skip_processed_pref'); }
+    function getAutoRewindPref() { return getPreference('d2l_auto_rewind_pref'); }
+    function setSkipProcessedPref(value) { localStorage.setItem('d2l_skip_processed_pref', String(value)); }
+    function setAutoRewindPref(value) { localStorage.setItem('d2l_auto_rewind_pref', String(value)); }
+
+    function normalizeName(value) {
+        let name = String(value || '').normalize('NFKC').trim().replace(/\s+/g, ' ');
+        const parts = name.split(',').map(p => p.trim());
+        if (parts.length === 2 && parts.every(Boolean)) name = parts[1] + ' ' + parts[0];
+        return name.toLowerCase();
+    }
+    function normalizeOrgId(value) { return String(value || '').trim().replace(/^#/, '').trim(); }
+
+    function findStudentData(studentName, db, studentOrgId = null) {
+        const entries = Object.entries(db || {});
+        const name = normalizeName(studentName);
+        const byName = entries.filter(([key, data]) => normalizeName(data.name || key) === name && name);
+        const wrap = ([key, data]) => ({...data, key, name: data.name || key});
+        if (studentOrgId) {
+            const id = normalizeOrgId(studentOrgId);
+            const byId = entries.filter(([, data]) => data.orgId && normalizeOrgId(data.orgId) === id);
+            if (byId.length !== 1) return {ambiguous: true, error: byId.length ? 'Duplicate OrgDefinedId.' : 'Page OrgDefinedId is not in this CSV.'};
+            if (byName.length && !byName.some(([key]) => key === byId[0][0])) {
+                return {ambiguous: true, error: 'Page name and OrgDefinedId identify different CSV records.'};
+            }
+            return {...wrap(byId[0]), matchedBy: 'OrgDefinedId'};
+        }
+        if (byName.length > 1) return {ambiguous: true, error: 'Name is not unique; a verified page OrgDefinedId is required.'};
+        return byName.length === 1 ? {...wrap(byName[0]), matchedBy: 'unique name'} : null;
+    }
+
+    function deepQuery(selector, root = document) {
+        const matches = new Set();
+        const roots = new Set();
+        function walk(scope) {
+            if (!scope || roots.has(scope)) return;
+            roots.add(scope);
+            try {
+                for (const el of scope.querySelectorAll(selector)) matches.add(el);
+                if (scope.shadowRoot) walk(scope.shadowRoot);
+                for (const el of scope.querySelectorAll('*')) {
+                    if (el.id === 'bs-helper-panel-root' || el.closest?.('#bs-helper-panel-root')) continue;
+                    if (el.shadowRoot) walk(el.shadowRoot);
+                    if (el.tagName === 'IFRAME') {
+                        try { walk(el.contentDocument); } catch (_) {}
+                    }
+                }
+            } catch (_) {}
+        }
+        walk(root);
+        return [...matches].filter(el => !el.closest?.('#bs-helper-panel-root') && el.id !== 'bs-helper-panel-root');
+    }
+
+    function getComposedParent(node) {
+        if (!node) return null;
+        if (node.parentElement) return node.parentElement;
+        const root = node.getRootNode?.();
+        if (root?.host) return root.host;
+        try { return root?.defaultView?.frameElement || null; } catch (_) { return null; }
+    }
+
+    function hasRubricAncestor(el) {
+        for (let cur = el; cur; cur = getComposedParent(cur)) {
+            const hint = (cur.tagName || '') + ' ' + (typeof cur.className === 'string' ? cur.className : '');
+            if (/rubric|criterion/i.test(hint)) return true;
+        }
+        return false;
+    }
+
+    function isVisible(el) {
+        if (!el || el.isConnected === false) return false;
+        for (let cur = el; cur; cur = getComposedParent(cur)) {
+            if (cur.hidden || cur.getAttribute?.('aria-hidden') === 'true') return false;
+            const style = window.getComputedStyle(cur);
+            if (style.display === 'none' || style.visibility === 'hidden') return false;
+        }
+        return el.getClientRects().length > 0;
+    }
+
+    function pageIdentity() {
+        const title = (document.title || '').split(/\s+-\s+/);
+        let name = title.length >= 3 && /assignment evaluation/i.test(title[0]) ? title[1].trim() : null;
+        const names = new Set(name ? [normalizeName(name)] : []);
+        const headers = deepQuery('d2l-consistent-evaluation-header, .d2l-consistent-evaluation-user-details').filter(isVisible);
+        const ids = new Set();
+        const add = value => { if (normalizeOrgId(value)) ids.add(normalizeOrgId(value)); };
+        for (const header of headers) {
+            const elements = [header, ...deepQuery('[data-org-defined-id], [data-orgdefinedid]', header)];
+            for (const el of elements) {
+                add(el.getAttribute('data-org-defined-id'));
+                add(el.getAttribute('data-orgdefinedid'));
+            }
+            const text = header.textContent || '';
+            const idMatch = text.match(/Org\s*Defined\s*ID\s*[:#]?\s*([A-Za-z0-9_-]+)/i);
+            if (idMatch) add(idMatch[1]);
+            const nameMatch = text.match(/Evaluation for\s+([^\n\r]+?)(?:\s+on\s+|$)/i);
+            if (nameMatch) {
+                names.add(normalizeName(nameMatch[1]));
+                if (!name) name = nameMatch[1].trim();
+            }
+        }
+        return {name, orgId: ids.size === 1 ? [...ids][0] : null,
+            error: ids.size > 1 ? 'Conflicting OrgDefinedId values in the evaluation header.'
+                : names.size > 1 ? 'Conflicting student names in the page title and evaluation header.' : null};
+    }
+    function getStudentNameFromPage() { return pageIdentity().name; }
+    function getStudentOrgIdFromPage() { return pageIdentity().orgId; }
+
+    function isOverallGradeElement(el) {
+        if (hasRubricAncestor(el)) return false;
+        const label = (el.getAttribute('label') || el.getAttribute('aria-label') || '').toLowerCase().trim();
+        return el.id === 'd2l-grade' || label === 'overall grade' || label === 'overall score';
+    }
+
+    function overallGradeControl() {
+        let matches = deepQuery('#d2l-grade, d2l-input-number, input[aria-label="Overall Grade"], input[aria-label="Overall Score"]')
+            .filter(el => isVisible(el) && isOverallGradeElement(el));
+        matches = matches.filter(el => !matches.some(other => other !== el && composedContains(other, el)));
+        if (matches.length !== 1) throw new Error('Expected one unambiguous Overall Grade control.');
+        return matches[0];
+    }
+
+    function composedContains(parent, child) {
+        for (let cur = getComposedParent(child); cur; cur = getComposedParent(cur)) if (cur === parent) return true;
+        return false;
+    }
+
+    function feedbackControl() {
+        const panels = deepQuery('d2l-consistent-evaluation-right-panel-feedback').filter(el => isVisible(el) && !hasRubricAncestor(el));
+        if (panels.length > 1) throw new Error('Multiple Overall Feedback panels; no feedback was written.');
+        const panel = panels[0] || null;
+        const selector = panel ? 'd2l-htmleditor' : 'd2l-htmleditor[aria-label="Overall Feedback"], d2l-htmleditor[label="Overall Feedback"]';
+        const editors = deepQuery(selector, panel || document).filter(el => isVisible(el) && !hasRubricAncestor(el));
+        if (editors.length > 1) throw new Error('Multiple Overall Feedback editors; no feedback was written.');
+        const editor = editors[0] || null;
+        if (editor) {
+            const iframes = deepQuery('iframe.tox-edit-area__iframe, iframe[id*="_ifr"]', editor);
+            if (iframes.length > 1) throw new Error('Multiple editor frames; no feedback was written.');
+            return {panel, editor, iframe: iframes[0] || null, textarea: null};
+        }
+        const textareas = deepQuery('textarea[aria-label="Overall Feedback"], textarea[name="overallFeedback"]', panel || document)
+            .filter(el => isVisible(el) && !hasRubricAncestor(el));
+        if (textareas.length !== 1) throw new Error('Expected one scoped Overall Feedback editor.');
+        return {panel, editor: null, iframe: null, textarea: textareas[0]};
+    }
+
+    function escapeHtml(text) {
+        return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+    function formatFeedbackHtml(plainText) {
+        return '<p>' + escapeHtml(plainText || '').replace(/\r?\n/g, '<br>') + '</p>';
+    }
+    function normalizeFeedback(text) { return String(text || '').replace(/\s+/g, ' ').trim(); }
+    function feedbackText(control) {
+        if (control.textarea) return control.textarea.value;
+        const tiny = window.tinymce?.get(control.editor._editorId);
+        const html = tiny ? tiny.getContent() : control.editor.html ?? control.iframe?.contentDocument?.body?.innerHTML;
+        if (typeof html !== 'string') throw new Error('Overall Feedback has not loaded.');
+        const template = document.createElement('template');
+        template.innerHTML = html.replace(/<br\s*\/?>|<\/(?:p|div|li)>/gi, '\n');
+        return template.content.textContent || '';
+    }
+
+    function scoreValue(control) {
+        const input = control.tagName === 'INPUT' ? control : deepQuery('input', control)[0];
+        const raw = control.value ?? input?.value;
+        if (raw === '' || raw === null || raw === undefined) return null;
+        const value = Number(raw);
+        if (!Number.isFinite(value)) throw new Error('Overall Grade is not a finite number.');
+        return value;
+    }
+
+    function expectedFor(data) {
+        return {score: String(data.score), reason: data.reason || '', checkFeedback: !!data.reason?.trim()};
+    }
+
+    function readbackMatches(expected) {
+        const score = scoreValue(overallGradeControl());
+        if (score === null || Math.abs(score - Number(expected.score)) > 0.0000001) return false;
+        return !expected.checkFeedback || normalizeFeedback(feedbackText(feedbackControl())) === normalizeFeedback(expected.reason);
+    }
+
+    function assertScoreFits(control, score) {
+        const number = Number(score);
+        if (!/^\d+(\.\d+)?$/.test(String(score)) || !Number.isFinite(number) || number < 0) throw new Error('Invalid score.');
+        const input = control.tagName === 'INPUT' ? control : deepQuery('input', control)[0];
+        for (const el of [control, input].filter(Boolean)) {
+            const max = el.getAttribute('max');
+            if (max !== null && max !== '' && Number.isFinite(Number(max)) && number > Number(max)) {
+                throw new Error('Score exceeds the current Overall Grade maximum.');
+            }
+        }
+    }
+
+    function deepFillScore(score, op, target, control = overallGradeControl()) {
+        if (!guardTarget(op, target)) return false;
+        assertScoreFits(control, score);
+        control.value = Number(score);
+        for (const input of deepQuery('input', control)) {
+            if (!guardTarget(op, target)) return false;
+            input.value = String(score);
+            input.dispatchEvent(new Event('input', {bubbles: true, composed: true}));
+            if (!guardTarget(op, target)) return false;
+            input.dispatchEvent(new Event('change', {bubbles: true, composed: true}));
+        }
+        if (!guardTarget(op, target)) return false;
+        control.dispatchEvent(new CustomEvent('change', {bubbles: true, composed: true}));
+        return guardTarget(op, target) && scoreValue(control) === Number(score);
+    }
+
+    function deepFillFeedback(text, op, target, control = feedbackControl()) {
+        if (!guardTarget(op, target)) return false;
+        const html = formatFeedbackHtml(text);
+        if (control.textarea) {
+            control.textarea.value = text;
+            control.textarea.dispatchEvent(new Event('input', {bubbles: true, composed: true}));
+            if (!guardTarget(op, target)) return false;
+            control.textarea.dispatchEvent(new Event('change', {bubbles: true, composed: true}));
+        } else {
+            const editor = control.editor;
+            editor.html = html;
+            editor.isDirty = true;
+            const tiny = window.tinymce?.get(editor._editorId);
+            if (tiny) {
+                tiny.setContent(html);
+                tiny.save();
+                for (const event of ['change', 'input', 'blur']) {
+                    if (!guardTarget(op, target)) return false;
+                    tiny.fire(event);
+                }
+            } else if (control.iframe?.contentDocument?.body) {
+                control.iframe.contentDocument.body.innerHTML = html;
+            }
+            if (!guardTarget(op, target)) return false;
+            // Compatibility bridge is restricted to the single resolved Overall Feedback panel.
+            if (control.panel && '_feedbackText' in control.panel) control.panel._feedbackText = html;
+            for (const event of ['input', 'change', 'd2l-htmleditor-blur']) {
+                if (!guardTarget(op, target)) return false;
+                editor.dispatchEvent(new CustomEvent(event, {bubbles: true, composed: true}));
+            }
+        }
+        return guardTarget(op, target) && normalizeFeedback(feedbackText(control)) === normalizeFeedback(text);
+    }
+
+    function setStatus(text, color = '#333') {
+        const el = document.getElementById('bs-op-status');
+        if (el) { el.textContent = text; el.style.color = color; }
+    }
+
+    function stopCruise(message = 'Stopped. No further automated actions.', color = '#d9534f') {
+        activeRunToken++;
+        isHalted = true;
+        activeOperation?.controller.abort();
+        activeOperation = null;
+        try { sessionStorage.removeItem(PENDING_KEY); } catch (_) {}
+        const button = document.getElementById('bs-btn-cruise');
+        if (button) { button.textContent = 'Start Auto-Cruise [Alt+A]'; button.style.background = '#198754'; }
+        setStatus(message, color);
+    }
+
+    function beginOperation(mode) {
+        stopCruise();
+        const ctx = getAssignmentContextKey();
+        if (!ctx) throw new Error('Cannot identify course and assignment. No action taken.');
+        const op = {token: activeRunToken, ctx, revision: getDatabaseRevision(), mode,
+            controller: new AbortController(), wraps: 0, hops: 0};
+        activeOperation = op;
+        isHalted = false;
+        return op;
+    }
+
+    function ownsOperation(op) {
+        return !!op && activeOperation === op && op.token === activeRunToken && !isHalted && !op.controller.signal.aborted;
+    }
+
+    function guardOperation(op) {
+        if (!ownsOperation(op)) return false;
+        if (getAssignmentContextKey() !== op.ctx || getDatabaseRevision() !== op.revision) {
+            stopCruise('Course, assignment, or imported CSV changed. Paused.');
+            return false;
+        }
+        return true;
+    }
+
+    function captureTarget(op, requireRow = true) {
+        if (!guardOperation(op)) throw new Error('Operation is no longer current.');
+        const identity = pageIdentity();
+        if (identity.error) throw new Error(identity.error);
+        if (!identity.name && !identity.orgId) throw new Error('Current student has not been identified.');
+        const db = getStudentDatabase();
+        const data = Object.keys(db).length ? findStudentData(identity.name, db, identity.orgId) : null;
+        if (data?.ambiguous) throw new Error(data.error);
+        if (requireRow && !data) throw new Error('Current student is not in this CSV; not classified as unsubmitted.');
+        return {ctx: op.ctx, url: window.location.href, name: normalizeName(identity.name),
+            orgId: identity.orgId, key: data?.key || null, data};
+    }
+
+    function targetMatches(target) {
+        const current = pageIdentity();
+        return !current.error && getAssignmentContextKey() === target.ctx && window.location.href === target.url &&
+            normalizeName(current.name) === target.name && current.orgId === target.orgId;
+    }
+
+    function guardTarget(op, target) {
+        if (!guardOperation(op)) return false;
+        if (!targetMatches(target)) {
+            stopCruise('Target student/page changed. Paused before the next action.');
+            return false;
+        }
+        return true;
+    }
+
+    function pauseOnError(op, error) {
+        if (ownsOperation(op)) stopCruise(error.message || String(error));
+    }
+
+    function finishOperation(op, text) {
+        if (guardOperation(op)) stopCruise(text, '#198754');
+    }
+
+    function delay(ms, op) {
+        if (!guardOperation(op)) return Promise.resolve(false);
+        return new Promise(resolve => {
+            const done = result => { clearTimeout(timer); op.controller.signal.removeEventListener('abort', abort); resolve(result); };
+            const abort = () => done(false);
+            const timer = setTimeout(() => done(guardOperation(op)), ms);
+            op.controller.signal.addEventListener('abort', abort, {once: true});
+        });
+    }
+
+    function buttonLabel(button) {
+        return (button.getAttribute('text') || button.getAttribute('aria-label') || button.textContent || '')
+            .trim().replace(/\s+/g, ' ').toLowerCase();
+    }
+
+    function buttons() {
+        let result = deepQuery('d2l-button, button, [role="button"]').filter(el => isVisible(el) && !hasRubricAncestor(el));
+        return result.filter(el => !result.some(parent => parent !== el && composedContains(parent, el) && parent.tagName === 'D2L-BUTTON'));
+    }
+
+    function isDisabled(button) {
+        return !!button.disabled || button.hasAttribute('disabled') || button.getAttribute('aria-disabled') === 'true';
+    }
+
+    function assertNoDialog() {
+        if (deepQuery('d2l-dialog-confirm, d2l-dialog, [role="alertdialog"], [role="dialog"], .d2l-dialog')
+            .some(el => isVisible(el) && (el.opened || el.hasAttribute('opened') || !el.tagName.toLowerCase().startsWith('d2l-')))) {
+            throw new Error('A dialog requires your review. No automatic confirmation was clicked.');
+        }
+    }
+
+    function saveDraftButton() {
+        assertNoDialog();
+        const all = buttons();
+        if (all.some(button => buttonLabel(button) === 'update')) {
+            throw new Error('An Update action is present. Published evaluations are not modified.');
+        }
+        const matches = all.filter(button => buttonLabel(button) === 'save draft');
+        if (matches.length !== 1 || isDisabled(matches[0])) throw new Error('One enabled Save Draft button is required.');
+        return matches[0];
+    }
+
+    function triggerSave(op, target) {
+        if (!guardTarget(op, target)) return false;
+        const button = saveDraftButton();
+        if (!guardTarget(op, target)) return false;
+        button.click();
+        return true; // Clicked only: never interpreted as a completed save.
+    }
+
+    function nativeSignals() {
+        return deepQuery('d2l-alert-toast, d2l-alert, [role="status"], [role="alert"]').filter(isVisible)
+            .map(node => ({node, text: normalizeFeedback((node.textContent || '') + ' ' + (node.shadowRoot?.textContent || '')).toLowerCase()}));
+    }
+
+    async function waitForSaveAcknowledgement(op, target, previous) {
+        for (let i = 0; i < 60; i++) {
+            if (!guardTarget(op, target)) return false;
+            assertNoDialog();
+            for (const {node, text} of nativeSignals()) {
+                if (/\b(error|failed|unable|invalid|could not|cannot)\b/.test(text)) throw new Error('Brightspace reports: ' + text);
+                const fresh = !previous.has(node) || previous.get(node) !== text;
+                const success = /\b(draft saved|saved as draft|evaluation saved|feedback saved|changes saved|saved successfully)\b/.test(text);
+                if (fresh && success && !/\b(not|unsaved|fail|error|publish)\b/.test(text)) return true;
+            }
+            if (!await delay(200, op)) return false;
+        }
+        throw new Error('No fresh native save acknowledgment. Save may have occurred; verify it manually before retrying.');
+    }
+
+    async function executeFill(op, target) {
+        if (!guardTarget(op, target)) return false;
+        assertNoDialog();
+        const data = target.data;
+        if (!data || data.submitted === false || data.score === null) throw new Error('This CSV row is explicitly unsubmitted; no grade is filled.');
+        const expected = expectedFor(data);
+        // Resolve every requested control before changing either one.
+        const grade = overallGradeControl();
+        const feedback = expected.checkFeedback ? feedbackControl() : null;
+        assertScoreFits(grade, expected.score);
+        // The native editor may clear isDirty during its change event. Remember our own writes.
+        locallyEditedTarget = target;
+        if (!deepFillScore(expected.score, op, target, grade)) throw new Error('Overall Grade did not accept the value.');
+        if (feedback && !deepFillFeedback(expected.reason, op, target, feedback)) throw new Error('Overall Feedback did not accept the text.');
+        return guardTarget(op, target) && readbackMatches(expected);
+    }
+
+    async function saveAndVerify(op, target, expected) {
+        if (!guardTarget(op, target)) return false;
+        if (!readbackMatches(expected)) throw new Error('Values changed before saving. Paused.');
+        saveDraftButton(); // Preflight before creating recovery state or clicking.
+        // Test storage before sending a save; readback cannot safely resume without it.
+        const pending = {schemaVersion: SCHEMA_VERSION, stage: 'waiting_ack', pageInstance: PAGE_INSTANCE,
+            createdAt: Date.now(), ctx: op.ctx, revision: op.revision, mode: op.mode,
+            wraps: op.wraps, hops: op.hops,
+            target: {ctx: target.ctx, url: target.url, name: target.name, orgId: target.orgId, key: target.key}, expected};
+        sessionStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+        const previous = new Map(nativeSignals().map(signal => [signal.node, signal.text]));
+        if (!triggerSave(op, target)) return false;
+        setStatus('Save Draft requested. Waiting for native confirmation...', '#006fbf');
+        if (!await waitForSaveAcknowledgement(op, target, previous) || !guardTarget(op, target)) return false;
+        if (!readbackMatches(expected)) throw new Error('Values changed during saving. Completion was not recorded.');
+        pending.stage = 'readback';
+        pending.createdAt = Date.now();
+        sessionStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+        setStatus('Save acknowledged. Reloading this student to verify stored values...', '#006fbf');
+        window.location.reload();
+        delay(15000, op).then(current => {
+            if (current && guardOperation(op)) stopCruise('Page reload did not complete. No verification was recorded.');
+        });
+        // Do not advance in this document. A new document must perform the readback.
+        return 'reload';
+    }
+
+    function navigationButton(direction) {
+        // Brightspace can show both a header arrow and a footer student button.
+        const all = buttons();
+        for (const label of [direction + ' student', direction]) {
+            const matches = all.filter(button => buttonLabel(button) === label);
+            if (matches.length > 1) throw new Error('Multiple ' + label + ' buttons.');
+            if (matches.length === 1) return matches[0];
+        }
+        throw new Error('Expected one ' + direction + ' student button.');
+    }
+
+    function isAtFirstStudent() { return isDisabled(navigationButton('previous')); }
+
+    async function navigateStudent(op, direction) {
+        if (!guardOperation(op)) return false;
+        assertNoDialog();
+        const target = captureTarget(op, false);
+        const button = navigationButton(direction);
+        if (isDisabled(button)) return 'end';
+        if (!guardTarget(op, target)) return false;
+        if (++op.hops > Math.max(20, Object.keys(getStudentDatabase()).length * 7 + 10)) {
+            throw new Error('Navigation limit reached. Review roster/filter before restarting.');
+        }
+        button.click();
+        let lastIdentity = null;
+        for (let i = 0; i < 60; i++) {
+            if (!await delay(150, op)) return false;
+            assertNoDialog();
+            const current = pageIdentity();
+            if (current.error) throw new Error(current.error);
+            const identity = normalizeName(current.name) + '|' + (current.orgId || '');
+            const changed = identity !== target.name + '|' + (target.orgId || '');
+            if ((current.name || current.orgId) && changed) {
+                if (lastIdentity === identity && !deepQuery('[aria-busy="true"], d2l-loading-spinner').some(isVisible)) return true;
+                lastIdentity = identity;
+            } else { lastIdentity = null; }
+        }
+        throw new Error('Student navigation did not finish. No grade was filled on the next page.');
+    }
+
+    async function rewindToFirstStudent(op) {
+        const cap = Math.max(10, Object.keys(getStudentDatabase()).length + 5);
+        for (let step = 0; step < cap; step++) {
+            if (!guardOperation(op)) return false;
+            if (isAtFirstStudent()) return true;
+            const result = await navigateStudent(op, 'previous');
+            if (!result || !guardOperation(op)) return false;
+            if (result === 'end') return true;
+        }
+        throw new Error('Could not reach the start of the roster within the navigation limit.');
+    }
+
+    function completedRecord(key, data) {
+        const record = getProcessedMap()[key];
+        if (!record || record.fingerprint !== recordFingerprint(data)) return false;
+        return data.submitted === false ? record.state === 'unsubmitted'
+            : (record.state === 'verified' && record.verification === 'reload_readback') ||
+                (record.state === 'matched' && record.verification === 'page_readback');
+    }
+
+    function progressSummary() {
+        const entries = Object.entries(getStudentDatabase());
+        const records = getProcessedMap();
+        const verified = entries.filter(([key, data]) => data.submitted !== false && completedRecord(key, data) && records[key].state === 'verified').length;
+        const matched = entries.filter(([key, data]) => data.submitted !== false && completedRecord(key, data) && records[key].state === 'matched').length;
+        const skipped = entries.filter(([key, data]) => data.submitted === false && completedRecord(key, data)).length;
+        const submitted = entries.filter(([, data]) => data.submitted !== false).length;
+        return {total: entries.length, submitted, verified, matched, skipped,
+            remaining: entries.filter(([key, data]) => !completedRecord(key, data)).map(([, data]) => data.name)};
+    }
+
+    function updateProgress() {
+        const progress = progressSummary();
+        const count = progress.verified + progress.matched + progress.skipped;
+        const percent = progress.total ? Math.round(count / progress.total * 100) : 0;
+        const text = document.getElementById('bs-progress-text');
+        const bar = document.getElementById('bs-progress-bar');
+        const badge = document.getElementById('bs-missing-badge');
+        if (text) text.textContent = 'Drafts verified: ' + progress.verified + '; existing matched: ' + progress.matched + '; unsubmitted: ' + progress.skipped;
+        if (bar) bar.style.width = percent + '%';
+        if (badge) {
+            badge.textContent = progress.total ? progress.remaining.length + ' CSV row(s) remaining' : 'Import a CSV for this assignment.';
+            badge.style.color = progress.total && !progress.remaining.length ? '#198754' : '#e67e22';
+        }
     }
 
     function playSuccessChime() {
         try {
             const ctx = new (window.AudioContext || window.webkitAudioContext)();
-            const now = ctx.currentTime;
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.type = 'sine';
-            // Melodic 4-note chime: C5, E5, G5, C6
-            osc.frequency.setValueAtTime(523.25, now);
-            osc.frequency.setValueAtTime(659.25, now + 0.12);
-            osc.frequency.setValueAtTime(783.99, now + 0.24);
-            osc.frequency.setValueAtTime(1046.50, now + 0.36);
-            gain.gain.setValueAtTime(0.12, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.start(now);
-            osc.stop(now + 0.7);
-        } catch(e) {}
+            const osc = ctx.createOscillator(), gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            gain.gain.setValueAtTime(0.08, ctx.currentTime);
+            [523.25, 659.25, 783.99, 1046.5].forEach((note, i) => osc.frequency.setValueAtTime(note, ctx.currentTime + i * 0.12));
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+            osc.onended = () => ctx.close();
+            osc.start(); osc.stop(ctx.currentTime + 0.6);
+        } catch (_) {}
     }
 
-    function deepQuery(selector, root = document) {
-        let matches = [];
-        try { matches = Array.from(root.querySelectorAll(selector)); } catch(e) {}
-        if (root.shadowRoot) {
-            matches = matches.concat(deepQuery(selector, root.shadowRoot));
-        }
-        try {
-            const allElements = root.querySelectorAll('*');
-            for (const el of allElements) {
-                if (el.id === 'bs-helper-panel-root' || (el.closest && el.closest('#bs-helper-panel-root'))) continue;
-                if (el.shadowRoot) {
-                    matches = matches.concat(deepQuery(selector, el.shadowRoot));
-                }
-            }
-        } catch(e) {}
-        try {
-            const iframes = root.querySelectorAll('iframe');
-            for (const iframe of iframes) {
-                try {
-                    if (iframe.contentDocument) {
-                        matches = matches.concat(deepQuery(selector, iframe.contentDocument));
-                    }
-                } catch(e) {}
-            }
-        } catch(e) {}
-
-        return matches.filter(el => {
-            if (!el) return false;
-            if (el.id && (el.id === 'bs-helper-panel-root' || el.id.startsWith('bs-btn-') || el.id.startsWith('bs-panel-'))) return false;
-            if (el.closest && el.closest('#bs-helper-panel-root')) return false;
-            return true;
-        });
-    }
-
-    function getStudentNameFromPage() {
-        // Brightspace standard: "Assignment Evaluation - <Student Name> - <Assignment Title>"
-        const rawTitle = document.title || '';
-        const titleParts = rawTitle.split(/\s+-\s+/);
-        if (titleParts.length >= 3 && titleParts[0].toLowerCase().includes('assignment evaluation')) {
-            const candidate = titleParts[1].trim();
-            if (candidate) return candidate;
-        }
-
-        // Secondary check: Evaluation navigation header
-        const h1s = deepQuery('h1, h2, h3, [class*="immersive-navigation" i], [class*="nav-bar" i], d2l-consistent-evaluation-header');
-        for (const h of h1s) {
-            const txt = h.textContent || '';
-            const m = txt.match(/Evaluation for\s+([^\n\r]+?)(?:\s+on\s+|$)/i);
-            if (m && m[1]) {
-                const cleaned = m[1].trim();
-                if (cleaned.length > 1 && cleaned.length < 50) return cleaned;
-            }
-        }
-
-        // Strictly do NOT perform whole-page body fallback to prevent false matches
-        return null;
-    }
-
-    function getStudentOrgIdFromPage() {
-        // 1. Check data attributes in Consistent Evaluation
-        const idElements = deepQuery('[data-org-defined-id], [data-orgdefinedid], [data-user-id], [data-emplid]');
-        for (const el of idElements) {
-            const id = el.getAttribute('data-org-defined-id') || el.getAttribute('data-orgdefinedid') || el.getAttribute('data-emplid') || el.getAttribute('data-user-id');
-            if (id && id.trim()) return id.trim();
-        }
-
-        // 2. Search Consistent Evaluation header or user details card for "Org Defined ID: xxx" or "ID: xxx"
-        const headerEls = deepQuery('d2l-consistent-evaluation-header, .d2l-consistent-evaluation-user-details, [class*="user-details" i]');
-        for (const h of headerEls) {
-            const txt = h.textContent || '';
-            const m = txt.match(/(?:Org\s*Defined\s*ID|Student\s*ID|EmplID)\s*[:#]?\s*([A-Za-z0-9_-]+)/i);
-            if (m && m[1]) return m[1].trim();
-        }
-
-        return null;
-    }
-
-    function isStudentAlreadySavedOnPage(expectedScore, expectedFeedback) {
-        if (expectedScore === null || expectedScore === undefined || expectedScore === '') return false;
-        
-        const gradeEls = deepQuery('#d2l-grade, d2l-input-number#d2l-grade, d2l-input-number');
-        let scoreMatches = false;
-        const target = parseFloat(expectedScore);
-        for (const gc of gradeEls) {
-            if (gc.value !== undefined && gc.value !== null && gc.value !== '') {
-                if (Math.abs(parseFloat(gc.value) - target) < 0.001) {
-                    scoreMatches = true;
-                    break;
-                }
-            }
-            const inner = deepQuery('input', gc);
-            for (const inp of inner) {
-                if (inp.value && Math.abs(parseFloat(inp.value) - target) < 0.001) {
-                    scoreMatches = true;
-                    break;
-                }
-            }
-        }
-
-        if (!scoreMatches) {
-            const fallbackInputs = deepQuery('input[class*="d2l-input" i], input[id*="score" i], input[aria-label*="score" i]');
-            for (const inp of fallbackInputs) {
-                if (inp.value && Math.abs(parseFloat(inp.value) - target) < 0.001) {
-                    scoreMatches = true;
-                    break;
-                }
-            }
-        }
-
-        let hasUpdateBtn = false;
-        const candidates = deepQuery('d2l-button, button, [role="button"]');
-        for (const b of candidates) {
-            const txt = (b.getAttribute('text') || b.textContent || '').trim().toLowerCase();
-            const aria = (b.getAttribute('aria-label') || '').toLowerCase();
-            if (txt === 'update' || txt.includes('update') || aria.includes('update')) {
-                hasUpdateBtn = true;
-                break;
-            }
-        }
-
-        // Verify feedback is actually populated and matches expected feedback!
-        if (expectedFeedback && expectedFeedback.trim().length > 0) {
-            const ed = deepQuery('d2l-htmleditor')[0];
-            const fb = deepQuery('d2l-consistent-evaluation-right-panel-feedback')[0];
-            const toxIframe = deepQuery('iframe.tox-edit-area__iframe')[0];
-            
-            let currentHtml = (ed ? ed.html : '') || (fb ? fb.feedbackText : '');
-            if (!currentHtml && toxIframe && toxIframe.contentDocument && toxIframe.contentDocument.body) {
-                currentHtml = toxIframe.contentDocument.body.innerHTML;
-            }
-            const cleanText = (currentHtml || '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
-            const normalizedExpected = expectedFeedback.replace(/\s+/g, ' ').trim();
-            if (cleanText.length === 0 || cleanText !== normalizedExpected) {
-                return false; // Feedback missing or modified in CSV -> MUST NOT SKIP!
-            }
-        }
-
-        return scoreMatches && hasUpdateBtn;
-    }
-
-    function getComposedParent(node) {
-        if (!node) return null;
-        return node.parentElement || (node.parentNode instanceof ShadowRoot ? node.parentNode.host : null);
-    }
-
-    function hasRubricAncestor(el) {
-        let cur = el;
-        while (cur) {
-            const tag = (cur.tagName || '').toLowerCase();
-            const cls = (cur.className || '');
-            if (tag.includes('rubric') || (typeof cls === 'string' && cls.toLowerCase().includes('rubric'))) {
-                return true;
-            }
-            cur = getComposedParent(cur);
-        }
-        return false;
-    }
-
-    function isOverallGradeElement(el) {
-        if (!el) return false;
-        if (hasRubricAncestor(el)) return false;
-        if (el.id === 'd2l-grade') return true;
-        const label = (el.getAttribute('label') || el.getAttribute('aria-label') || '').toLowerCase();
-        if (label.includes('rubric') || label.includes('criterion')) return false;
-        if (label.includes('overall grade') || label.includes('overall score') || label === 'grade' || label === 'score') return true;
-        const parent = getComposedParent(el);
-        if (parent && (parent.tagName || '').toLowerCase().includes('grade')) return true;
-        return false;
-    }
-
-
-    function deepFillScore(scoreVal) {
-        if (scoreVal === null || scoreVal === undefined || scoreVal === '') return false;
-
-        const allCandidates = deepQuery('#d2l-grade, d2l-input-number#d2l-grade, d2l-input-number');
-        const gradeEls = allCandidates.filter(isOverallGradeElement);
-
-        if (gradeEls.length === 0) {
-            console.warn('[D2L-AutoFeedback] Overall grade element not found.');
-            return false;
-        }
-        if (gradeEls.length > 1) {
-            console.error('[D2L-AutoFeedback] Ambiguous overall grade elements: multiple candidates found. Pausing.');
-            return false;
-        }
-
-        const gc = gradeEls[0];
-        try { gc.value = parseFloat(scoreVal); } catch(e) {}
-
-        const innerInputs = deepQuery('input', gc);
-        for (const inp of innerInputs) {
-            try {
-                inp.focus();
-                inp.value = scoreVal;
-                inp.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-                inp.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-                inp.blur();
-            } catch(e) {}
-        }
-
-        try {
-            gc.dispatchEvent(new CustomEvent('change', { bubbles: true, composed: true }));
-        } catch(e) {}
-
-        return true;
-    }
-
-    // Complete Siren & Blur Event synchronized feedback injection
-    function escapeHtml(text) {
-        return String(text)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    }
-
-    function formatFeedbackHtml(plainText) {
-        if (!plainText) return '<p></p>';
-        const safe = escapeHtml(plainText);
-        const lines = safe.split(/\r?\n/);
-        return '<p>' + lines.join('<br>') + '</p>';
-    }
-
-    function deepFillFeedback(plainText) {
-        if (!plainText) return false;
-        const html = formatFeedbackHtml(plainText);
-        let filled = false;
-
-        const win = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
-        const tiny = win.tinymce || window.tinymce;
-
-        // 1. Target d2l-htmleditor & TinyMCE instance directly
-        const editors = deepQuery('d2l-htmleditor');
-        for (const ed of editors) {
-            try {
-                ed.html = html;
-                ed.isDirty = true;
-                
-                // Sync via TinyMCE instance if available
-                if (tiny && ed._editorId) {
-                    const tEd = tiny.get(ed._editorId);
-                    if (tEd) {
-                        tEd.focus();
-                        tEd.setContent(html);
-                        tEd.save();
-                        tEd.fire('change');
-                        tEd.fire('input');
-                        tEd.fire('blur');
-                    }
-                }
-
-                // CRITICAL: Brightspace feedback panel only synchronizes on 'd2l-htmleditor-blur'
-                ed.dispatchEvent(new CustomEvent('d2l-htmleditor-blur', { bubbles: true, composed: true }));
-                ed.dispatchEvent(new CustomEvent('change', { bubbles: true, composed: true }));
-                ed.dispatchEvent(new CustomEvent('input', { bubbles: true, composed: true }));
-                filled = true;
-            } catch(e) {}
-        }
-
-        // 2. Direct sync with parent feedback container (d2l-consistent-evaluation-right-panel-feedback)
-        const fbPanels = deepQuery('d2l-consistent-evaluation-right-panel-feedback');
-        for (const fb of fbPanels) {
-            try {
-                fb._feedbackText = html;
-                // Note: Do NOT invoke fb._saveFeedback() directly during plain fill to prevent unverified background writes.
-                filled = true;
-            } catch(e) {}
-        }
-
-        // 3. Fallback sync to iframe DOM
-        const toxIframes = deepQuery('iframe.tox-edit-area__iframe, iframe[id*="_ifr"]');
-        for (const f of toxIframes) {
-            try {
-                if (f.contentDocument && f.contentDocument.body) {
-                    f.contentDocument.body.innerHTML = html;
-                    f.contentDocument.body.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-                    f.contentDocument.body.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-                    filled = true;
-                }
-            } catch(e) {}
-        }
-
-        // 4. Textarea fallback
-        const textareas = deepQuery('textarea');
-        for (const ta of textareas) {
-            const id = (ta.id || '').toLowerCase();
-            const name = (ta.name || '').toLowerCase();
-            if (id.includes('feedback') || name.includes('feedback') || textareas.length === 1 || id.includes('uid')) {
-                try {
-                    ta.focus();
-                    ta.value = plainText;
-                    ta.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-                    ta.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-                    ta.blur();
-                    filled = true;
-                } catch(e) {}
-            }
-        }
-
-        return filled;
-    }
-
-    function triggerSave() {
-        const candidates = deepQuery('d2l-button, button, [role="button"]');
-        for (const b of candidates) {
-            if (b.disabled || b.hasAttribute('disabled')) continue;
-            const txt = (b.getAttribute('text') || b.textContent || '').trim().toLowerCase();
-            const aria = (b.getAttribute('aria-label') || '').toLowerCase();
-            
-            // Strictly require 'save draft' - do NOT accept 'update' or generic 'save'
-            const isSaveDraft = txt === 'save draft' || aria === 'save draft' || txt.includes('save draft') || aria.includes('save draft');
-            if (isSaveDraft) {
-                console.log('[D2L-AutoFeedback] Triggering Save Draft on element:', b);
-                if (b.shadowRoot) {
-                    const inner = b.shadowRoot.querySelector('button');
-                    if (inner && !inner.disabled) {
-                        inner.click();
-                        return true;
-                    }
-                }
-                b.click();
-                return true;
-            }
-        }
-        return false;
-    }
-
-    function autoConfirmDialog() {
-        const dialogs = deepQuery('d2l-dialog-confirm, d2l-dialog, [role="alertdialog"], [role="dialog"], .d2l-dialog');
-        for (const d of dialogs) {
-            const isOpen = d.opened || d.hasAttribute('opened') || (d.style && d.style.display !== 'none' && d.offsetWidth > 0);
-            if (!isOpen) continue;
-
-            const dialogText = (d.textContent || '').toLowerCase();
-            
-            // 1. Immediately halt on destructive keywords with ZERO side-effects
-            if (dialogText.includes('delete') || dialogText.includes('remove') || dialogText.includes('discard') || dialogText.includes('erase')) {
-                console.warn('[D2L-AutoFeedback] Destructive dialog detected! Halting automation with zero side effects:', dialogText);
-                stopCruise('⚠️ Destructive dialog detected. Halting automation for safety.', '#dc3545');
-                return false;
-            }
-
-            // 2. Only allow safe navigation confirmation
-            const isSafeNav = dialogText.includes('unsaved') || dialogText.includes('save draft') || dialogText.includes('leave');
-            if (!isSafeNav) {
-                console.warn('[D2L-AutoFeedback] Unrecognized dialog detected. Halting automation.');
-                stopCruise('⚠️ Unrecognized confirmation dialog appeared. Paused for review.', '#f0ad4e');
-                return false;
-            }
-
-            // 3. Find buttons: strictly reject "don't save" or cancellation
-            const btns = deepQuery('button, d2l-button', d);
-            for (const b of btns) {
-                if (b.disabled || b.hasAttribute('disabled')) continue;
-                const act = (b.getAttribute('data-dialog-action') || b.getAttribute('dialog-action') || '').toLowerCase();
-                const txt = (b.getAttribute('text') || b.textContent || '').trim().toLowerCase();
-
-                if (txt.includes("don't") || txt.includes('dont') || txt.includes('cancel') || txt === 'no' || act === 'no' || act === 'cancel') {
-                    continue;
-                }
-
-                if (act === 'yes' || act === 'save' || txt === 'save' || txt === 'save draft' || txt === 'yes' || act === 'proceed' || txt === 'proceed') {
-                    console.log('[D2L-AutoFeedback] Clicking safe navigation button:', b);
-                    if (b.shadowRoot) {
-                        const inner = b.shadowRoot.querySelector('button');
-                        if (inner && !inner.disabled) inner.click();
-                        else b.click();
-                    } else {
-                        b.click();
-                    }
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    function deepClickNext() {
-        const nextBtns = deepQuery('button[aria-label="Next Student"], button[aria-label="Next"]');
-        for (const b of nextBtns) {
-            if (b.disabled || b.hasAttribute('disabled')) {
-                console.warn('[D2L-AutoFeedback] Next button is disabled (End of roster)');
-                return 'DISABLED';
-            }
-            b.click();
-            return 'CLICKED';
-        }
-        return 'NOT_FOUND';
-    }
-
-    function deepClickPrev() {
-        const prevBtns = deepQuery('button[aria-label="Previous Student"], button[aria-label="Previous"]');
-        for (const b of prevBtns) {
-            if (b.disabled || b.hasAttribute('disabled')) {
-                console.warn('[D2L-AutoFeedback] Prev button is disabled (Start of roster)');
-                return 'DISABLED';
-            }
-            b.click();
-            return 'CLICKED';
-        }
-        return 'NOT_FOUND';
-    }
-
-    function isAtFirstStudent() {
-        const prevBtns = deepQuery('button[aria-label="Previous Student"], button[aria-label="Previous"]');
-        if (prevBtns.length === 0) return false;
-        return prevBtns.some(b => b.disabled || b.hasAttribute('disabled'));
-    }
-
-    async function rewindToFirstStudent() {
-        setStatus('⏪ Rewinding to first student in roster...', '#006fbf');
-        let steps = 0;
-        while (!isHalted && autoCruiseActive && steps < 70) {
-            if (isAtFirstStudent()) {
-                console.log('[D2L-AutoFeedback] Arrived at first student!');
-                return true;
-            }
-            const res = deepClickPrev();
-            if (res === 'DISABLED') {
-                return true;
-            }
-            if (res !== 'CLICKED') {
-                await sleep(500);
-                if (isAtFirstStudent()) return true;
-                break;
-            }
-            await waitForPageTransition();
-            steps++;
-        }
-        return isAtFirstStudent();
-    }
-
-    function executeFill(showNotification = true) {
-        if (isHalted) return false;
-
-        const db = getStudentDatabase();
-        const student = getStudentNameFromPage();
-        const statusEl = document.getElementById('bs-op-status');
-
-        if (!student) {
-            const msg = '⚠️ Could not identify student name on current page';
-            if (statusEl && showNotification) {
-                statusEl.textContent = msg;
-                statusEl.style.color = '#d9534f';
-            }
-            return false;
-        }
-
-        const data = findStudentData(student, db, getStudentOrgIdFromPage());
-        if (!data) {
-            if (statusEl && showNotification) {
-                statusEl.textContent = `⚠️ Student ${student} not found in CSV database`;
-                statusEl.style.color = '#f0ad4e';
-            }
-            return false;
-        }
-
-        if (data.ambiguous) {
-            const msg = `⚠️ Ambiguous student name: multiple records match ${student}. Paused for safety.`;
-            if (statusEl) { statusEl.textContent = msg; statusEl.style.color = '#dc3545'; }
-            stopCruise(msg, '#dc3545');
-            return false;
-        }
-
-        if (data.score === null || data.score === undefined || data.submitted === false) {
-            const msg = `⚠️ Student ${student} has no submission; skipping grading`;
-            if (statusEl && showNotification) {
-                statusEl.textContent = msg;
-                statusEl.style.color = '#f0ad4e';
-            }
-            return false;
-        }
-
-        const hasScore = data.score !== null && data.score !== undefined && data.score !== '';
-        const hasReason = !!(data.reason && data.reason.trim());
-
-        let scoreOk = !hasScore;
-        let feedbackOk = !hasReason;
-
-        if (hasScore) scoreOk = deepFillScore(data.score);
-        if (hasReason) feedbackOk = deepFillFeedback(data.reason);
-
-        const allOk = scoreOk && feedbackOk;
-        console.log(`[D2L-AutoFeedback] Filled ${student} -> ScoreOk: ${scoreOk}, FeedbackOk: ${feedbackOk}`);
-
-        if (statusEl && showNotification) {
-            if (allOk) {
-                statusEl.textContent = `✔ Filled ${student} (Score: ${data.score || 'N/A'}, Feedback: ${hasReason ? 'synced' : 'N/A'})`;
-                statusEl.style.color = '#28a745';
-            } else {
-                statusEl.textContent = `⚠️ Incomplete fill for ${student}: Score (${scoreOk ? '✔' : '❌'}), Feedback (${feedbackOk ? '✔' : '❌'})`;
-                statusEl.style.color = '#f0ad4e';
-            }
-        }
-
-        return allOk;
-    }
-
-    function updateProgress() {
-        const db = getStudentDatabase();
-        const total = Object.keys(db).length;
-        const map = getProcessedMap();
-        const processedUnion = new Set([...Object.keys(map), ...processedSet]);
-        const count = processedUnion.size;
-        const pct = total > 0 ? Math.round((count / total) * 100) : 0;
-
-        const submittedNames = Object.keys(db).filter(n => db[n] && db[n].submitted !== false && db[n].score !== null && db[n].score !== '');
-        const unsubmittedNames = Object.keys(db).filter(n => !submittedNames.includes(n));
-        const missingSubmitted = submittedNames.filter(n => !processedUnion.has(n));
-
-        const pText = document.getElementById('bs-progress-text');
-        const pBar = document.getElementById('bs-progress-bar');
-        if (pText) pText.textContent = `Processed: ${count} / ${total} (${pct}%)`;
-        if (pBar) pBar.style.width = `${pct}%`;
-
-        // Missing students badge
-        const missingEl = document.getElementById('bs-missing-badge');
-        if (missingEl) {
-            if (missingSubmitted.length === 0) {
-                missingEl.textContent = `🎉 All ${submittedNames.length} submitted students 100% complete! (${unsubmittedNames.length} unsubmitted skipped)`;
-                missingEl.style.color = '#28a745';
-            } else {
-                missingEl.textContent = `Remaining submitted: ${missingSubmitted.length} students (Auto-covered)`;
-                missingEl.style.color = '#e67e22';
-            }
-        }
-    }
-
-    function setStatus(text, color = '#333') {
-        const el = document.getElementById('bs-op-status');
-        if (el) {
-            el.textContent = text;
-            el.style.color = color;
-        }
-    }
-
-    function stopCruise(msg = '🛑 Auto-Cruise stopped', color = '#d9534f') {
-        autoCruiseActive = false;
-        isProcessingCurrent = false;
-        currentProcessingStudent = null;
-        if (cruiseInterval) {
-            clearInterval(cruiseInterval);
-            cruiseInterval = null;
-        }
-        const cruiseBtn = document.getElementById('bs-btn-cruise');
-        if (cruiseBtn) {
-            cruiseBtn.textContent = '🚀 Start Auto-Cruise';
-            cruiseBtn.style.background = '#198754';
-        }
-        setStatus(msg, color);
-    }
-
-    async function waitForPageTransition() {
-        const initialUrl = window.location.href;
-        const initialStudent = getStudentNameFromPage();
-        for (let i = 0; i < 30; i++) {
-            await sleep(150);
-            if (isHalted || !autoCruiseActive) break;
-            // Actively sweep and auto-confirm any "Unsaved Changes" dialogs triggered by navigation
-            autoConfirmDialog();
-            if (window.location.href !== initialUrl) break;
-            const curStudent = getStudentNameFromPage();
-            if (curStudent && curStudent !== initialStudent) break;
-        }
-        autoConfirmDialog();
-        await sleep(300);
-    }
-
-    async function cruiseStep(token) {
-        if (token !== activeRunToken || isHalted || !autoCruiseActive || isProcessingCurrent) return;
-
-        const db = getStudentDatabase();
-        const student = getStudentNameFromPage();
-
-        if (!student) {
-            setStatus('⏳ Waiting for evaluation page to render...', '#006fbf');
-            return;
-        }
-
-        const data = findStudentData(student, db, getStudentOrgIdFromPage());
-
-        // Ambiguity check MUST COME FIRST: Halt immediately if multiple students match page name
-        if (data && data.ambiguous) {
-            stopCruise(`⚠️ Multiple students in CSV match "${student}". Paused for manual TA selection.`, '#dc3545');
-            return;
-        }
-
-        // 1. Unsubmitted student -> Auto-Skip & Advance
-        if (!data || data.score === null || data.score === undefined || data.score === '' || data.submitted === false) {
-            isProcessingCurrent = true;
-            markStudentProcessed(student, { unsubmitted: true });
-            processedSet.add(student);
+    async function cruiseStep(op) {
+        if (!guardOperation(op)) return false;
+        const target = captureTarget(op);
+        const data = target.data;
+        if (data.submitted === false) {
+            if (!guardTarget(op, target)) return false;
+            markStudentProcessed(data.key, {state: 'unsubmitted'});
             updateProgress();
-            setStatus(`⚠️ [Unsubmitted] ${student} (no submission) - Auto-skipping...`, '#f0ad4e');
-            console.log(`[D2L-AutoFeedback] Auto-skipping unsubmitted student: ${student}`);
-            await sleep(400);
-            if (isHalted || !autoCruiseActive) { isProcessingCurrent = false; return; }
-
-            const nav = deepClickNext();
-            if (nav === 'DISABLED') {
-                await checkWrapAroundOrFinish();
-                isProcessingCurrent = false;
-                return;
-            }
-            await waitForPageTransition();
-            isProcessingCurrent = false;
-            return;
+            if (!await delay(200, op) || !guardTarget(op, target)) return false;
+            return 'advance';
         }
-
-        // 2. Already Processed Check (Fast Cruise)
-        const skipPref = getSkipProcessedPref();
-        const map = getProcessedMap();
-        const isRecorded = !!map[student] || processedSet.has(student);
-        const isSavedOnPage = isStudentAlreadySavedOnPage(data.score, data.reason);
-
-        // Only skip if genuinely saved on page with non-empty feedback
-        if (skipPref && (isRecorded || isSavedOnPage)) {
-            if (isSavedOnPage) {
-                isProcessingCurrent = true;
-                if (!isRecorded) {
-                    markStudentProcessed(student, { score: data.score, source: 'page_detected' });
+        if (getSkipProcessedPref() && readbackMatches(expectedFor(data))) {
+            assertNoDialog();
+            const published = buttons().some(button => buttonLabel(button) === 'update');
+            const editor = data.reason?.trim() ? feedbackControl().editor : null;
+            const dirty = (locallyEditedTarget && targetMatches(locallyEditedTarget)) || editor?.isDirty === true ||
+                window.tinymce?.get(editor?._editorId)?.isDirty?.() === true;
+            if (!dirty && (published || completedRecord(data.key, data))) {
+                if (!completedRecord(data.key, data)) {
+                    markStudentProcessed(data.key, {state: 'matched', verification: 'page_readback'});
+                    updateProgress();
                 }
-                processedSet.add(student);
-                updateProgress();
-                setStatus(`⏩ [Ready] ${student} (Score: ${data.score}, Feedback synced) - Fast skipping...`, '#007a4d');
-                console.log(`[D2L-AutoFeedback] Fast skipping already processed student: ${student}`);
-                await sleep(400);
-                if (isHalted || !autoCruiseActive) { isProcessingCurrent = false; return; }
-
-                const nav = deepClickNext();
-                if (nav === 'DISABLED') {
-                    await checkWrapAroundOrFinish();
-                    isProcessingCurrent = false;
-                    return;
-                }
-                await waitForPageTransition();
-                isProcessingCurrent = false;
-                return;
+                if (!await delay(200, op) || !guardTarget(op, target)) return false;
+                return 'advance';
             }
         }
-
-        // 3. Submitted Student -> Fill, Save, Dismiss Dialog, Advance
-        isProcessingCurrent = true;
-        currentProcessingStudent = student;
-        setStatus(`🚀 [Cruising] Filling: ${student}...`, '#007a4d');
-
-        const ok = executeFill(false);
-        if (!ok) {
-            setStatus(`⚠️ Waiting for inputs: ${student}...`, '#f0ad4e');
-            isProcessingCurrent = false;
-            return;
-        }
-
-        await sleep(800);
-        if (token !== activeRunToken || isHalted || !autoCruiseActive) { isProcessingCurrent = false; return; }
-
-        setStatus(`💾 [Cruising] Saving Draft: ${student}...`, '#007a4d');
-        const saveOk = triggerSave();
-        if (!saveOk) {
-            stopCruise(`⚠️ Save Draft button not found or disabled for ${student}. Paused for verification.`, '#dc3545');
-            isProcessingCurrent = false;
-            return;
-        }
-
-        await sleep(1800);
-        if (token !== activeRunToken || isHalted || !autoCruiseActive) { isProcessingCurrent = false; return; }
-
-        autoConfirmDialog();
-
-        markStudentProcessed(student, { score: data.score, source: 'evaluated' });
-        processedSet.add(student);
-        updateProgress();
-
-        setStatus(`⏭️ [Cruising] Advancing to next student...`, '#006fbf');
-        await sleep(500);
-        if (token !== activeRunToken || isHalted || !autoCruiseActive) { isProcessingCurrent = false; return; }
-
-        const navRes = deepClickNext();
-        if (navRes === 'DISABLED') {
-            await checkWrapAroundOrFinish();
-            isProcessingCurrent = false;
-            return;
-        }
-
-        await waitForPageTransition();
-        isProcessingCurrent = false;
+        // Refuse unsupported/published save actions before changing fields.
+        saveDraftButton();
+        if (!await executeFill(op, target) || !guardTarget(op, target)) return false;
+        if (!await delay(250, op) || !guardTarget(op, target)) return false;
+        return saveAndVerify(op, target, expectedFor(data));
     }
 
-    async function checkWrapAroundOrFinish() {
-        const db = getStudentDatabase();
-        const map = getProcessedMap();
-        const processedUnion = new Set([...Object.keys(map), ...processedSet]);
-        
-        // Only require wrap-around for students who actually SUBMITTED homework
-        const submittedStudents = Object.keys(db).filter(n => {
-            const s = db[n];
-            return s && s.submitted !== false && s.score !== null && s.score !== undefined && s.score !== '';
-        });
-        const missingSubmitted = submittedStudents.filter(n => !processedUnion.has(n));
+    async function runCruise(op) {
+        try {
+            while (guardOperation(op)) {
+                const step = await cruiseStep(op);
+                if (step !== 'advance' || !guardOperation(op)) return;
+                const navigation = await navigateStudent(op, 'next');
+                if (!navigation || !guardOperation(op)) return;
+                if (navigation === 'end') {
+                    const progress = progressSummary();
+                    if (!progress.remaining.length && progress.total) {
+                        playSuccessChime();
+                        finishOperation(op, 'CSV complete: ' + progress.verified + ' reload-verified drafts; ' + progress.matched + ' existing evaluations matched; ' + progress.skipped + ' explicitly unsubmitted.');
+                        return;
+                    }
+                    if (!getAutoRewindPref() || op.wraps >= 2) throw new Error('CSV rows remain unverified: ' + progress.remaining.slice(0, 5).join(', '));
+                    op.wraps++;
+                    if (!await rewindToFirstStudent(op)) return;
+                }
+            }
+        } catch (error) { pauseOnError(op, error); }
+    }
 
-        // Trigger wrap-around only if genuinely submitted students are missing AND we haven'''t already done a wrap-around pass
-        if (missingSubmitted.length > 0 && !isAtFirstStudent() && getAutoRewindPref() && wrapAroundPasses < 2) {
-            wrapAroundPasses++;
-            setStatus(`🔄 Reached end, but ${missingSubmitted.length} submitted students remain! Auto-rewinding (pass ${wrapAroundPasses})...`, '#e67e22');
-            console.log('[D2L-AutoFeedback] Wrap-around: rewinding to beginning to cover missing submitted students:', missingSubmitted);
-            await sleep(1000);
-            await rewindToFirstStudent();
-            setStatus('📍 Returned to start of roster, continuing cruise to cover remaining students...', '#006fbf');
+    async function startCruise() {
+        if (activeOperation?.mode === 'cruise') { stopCruise('Auto-Cruise paused.'); return; }
+        let op;
+        try {
+            op = beginOperation('cruise');
+            if (!Object.keys(getStudentDatabase()).length) throw new Error('Import a valid CSV before starting.');
+            const button = document.getElementById('bs-btn-cruise');
+            if (button) button.textContent = 'Pause Auto-Cruise [Alt+A]';
+            setStatus('Auto-Cruise started; drafts require reload readback.', '#006fbf');
+            if (getAutoRewindPref() && !await rewindToFirstStudent(op)) return;
+            if (guardOperation(op)) await runCruise(op);
+        } catch (error) { if (op) pauseOnError(op, error); else setStatus(error.message, '#d9534f'); }
+    }
+
+    async function manualAction(action) {
+        let op;
+        try {
+            op = beginOperation('manual');
+            if (action === 'first') {
+                if (await rewindToFirstStudent(op)) finishOperation(op, 'At the first student.');
+                return;
+            }
+            if (action === 'next' || action === 'previous') {
+                const result = await navigateStudent(op, action);
+                if (result) finishOperation(op, result === 'end' ? 'At the roster boundary.' : 'Navigation finished.');
+                return;
+            }
+            const target = captureTarget(op, action !== 'save');
+            let expected;
+            if (action === 'save') {
+                const score = scoreValue(overallGradeControl());
+                if (score === null) throw new Error('No numeric Overall Grade is present.');
+                expected = {score: String(score), reason: feedbackText(feedbackControl()), checkFeedback: true};
+            } else {
+                if (action === 'fill-save') saveDraftButton();
+                if (!await executeFill(op, target)) return;
+                expected = expectedFor(target.data);
+            }
+            if (!guardTarget(op, target)) return;
+            if (action === 'fill') { finishOperation(op, 'Values filled only. This is not a verified save.'); return; }
+            if (!await delay(250, op) || !guardTarget(op, target)) return;
+            await saveAndVerify(op, target, expected);
+        } catch (error) { if (op) pauseOnError(op, error); else setStatus(error.message, '#d9534f'); }
+    }
+
+    async function restorePendingReadback() {
+        let pending;
+        try { pending = JSON.parse(sessionStorage.getItem(PENDING_KEY)); }
+        catch (_) { stopCruise('Pending readback could not be read; paused.'); return; }
+        if (!pending) return;
+        const navigationType = performance.getEntriesByType('navigation')[0]?.type;
+        if (pending.schemaVersion !== SCHEMA_VERSION || pending.stage !== 'readback' ||
+            pending.pageInstance === PAGE_INSTANCE || navigationType !== 'reload' ||
+            Date.now() - pending.createdAt > READBACK_TTL || Date.now() < pending.createdAt ||
+            pending.ctx !== getAssignmentContextKey() || pending.revision !== getDatabaseRevision() ||
+            pending.target?.url !== window.location.href) {
+            stopCruise('Pending save was not resumed: reload, context, CSV revision, or time limit did not match.');
             return;
         }
+        const op = beginOperation(pending.mode === 'cruise' ? 'cruise' : 'manual');
+        op.wraps = pending.wraps || 0; op.hops = pending.hops || 0;
+        try {
+            setStatus('Reading the reloaded evaluation; no values are being filled...', '#006fbf');
+            let matches = 0;
+            for (let i = 0; i < 60; i++) {
+                if (!guardOperation(op)) return;
+                const identity = pageIdentity();
+                if (identity.error) throw new Error(identity.error);
+                if (identity.name || identity.orgId) {
+                    if (!guardTarget(op, pending.target)) return;
+                    assertNoDialog();
+                    try { matches = readbackMatches(pending.expected) ? matches + 1 : 0; }
+                    catch (_) { matches = 0; } // Components can render after the page title.
+                    if (matches >= 2) {
+                        const data = getStudentDatabase()[pending.target.key];
+                        if (data && data.submitted !== false &&
+                            Number(data.score) === Number(pending.expected.score) &&
+                            (!data.reason?.trim() || normalizeFeedback(data.reason) === normalizeFeedback(pending.expected.reason))) {
+                            markStudentProcessed(pending.target.key, {state: 'verified', verification: 'reload_readback'});
+                        }
+                        updateProgress();
+                        if (op.mode === 'cruise') {
+                            if (!data || !completedRecord(pending.target.key, data)) throw new Error('Readback could not be reconciled to the CSV.');
+                            // Resume at the next student, not by saving the just-verified draft again.
+                            const navigation = await navigateStudent(op, 'next');
+                            if (!navigation || !guardOperation(op)) return;
+                            if (navigation === 'end') {
+                                const progress = progressSummary();
+                                if (!progress.remaining.length) {
+                                    playSuccessChime();
+                                    finishOperation(op, 'CSV complete: ' + progress.verified + ' reload-verified drafts; ' + progress.skipped + ' explicitly unsubmitted.');
+                                    return;
+                                }
+                                if (!getAutoRewindPref() || op.wraps >= 2) throw new Error('CSV still has unverified students; review the roster/filter.');
+                                op.wraps++;
+                                if (!await rewindToFirstStudent(op)) return;
+                            }
+                            await runCruise(op);
+                        } else { finishOperation(op, 'Draft save verified by reloading and reading the same student.'); }
+                        return;
+                    }
+                }
+                if (!await delay(250, op)) return;
+            }
+            throw new Error('Reloaded score/feedback did not match. Completion was not recorded; review this student.');
+        } catch (error) { pauseOnError(op, error); }
+    }
 
-        const unsubmittedCount = Object.keys(db).length - submittedStudents.length;
-        if (missingSubmitted.length > 0) {
-            // Strictly do NOT claim 100% completion if students were missed
-            const sampleMissing = missingSubmitted.slice(0, 3).join(', ') + (missingSubmitted.length > 3 ? '...' : '');
-            stopCruise(`⚠️ Reached end of roster, but ${missingSubmitted.length} submitted student(s) remain unprocessed (${sampleMissing}). Please review roster filter.`, '#e67e22');
-            return;
+    function parseCSV(text) {
+        const rows = [];
+        let row = [], field = '', quoted = false, closed = false;
+        text = String(text).replace(/^\uFEFF/, '');
+        const pushField = () => { row.push(field); field = ''; closed = false; };
+        const pushRow = () => { pushField(); if (row.some(value => value.trim())) rows.push(row); row = []; };
+        for (let i = 0; i < text.length; i++) {
+            const char = text[i];
+            if (quoted) {
+                if (char === '"' && text[i + 1] === '"') { field += '"'; i++; }
+                else if (char === '"') { quoted = false; closed = true; }
+                else field += char;
+            } else if (char === ',') pushField();
+            else if (char === '\n' || char === '\r') {
+                if (char === '\r' && text[i + 1] === '\n') i++;
+                pushRow();
+            } else if (char === '"') {
+                if (field.trim() || closed) throw new Error('Malformed CSV quote.');
+                field = ''; quoted = true;
+            } else if (closed) {
+                if (!/\s/.test(char)) throw new Error('Unexpected text after a quoted CSV field.');
+            } else field += char;
         }
+        if (quoted) throw new Error('CSV has an unclosed quoted field.');
+        if (field || row.length || closed) pushRow();
+        return rows;
+    }
 
-        playSuccessChime();
-        const completeMsg = unsubmittedCount > 0 
-            ? `🎉 All ${submittedStudents.length} submitted assignments verified & complete! (${unsubmittedCount} unsubmitted students safely skipped)`
-            : '🎉 Reached end of roster. Entire class verified & 100% completed!';
-        stopCruise(completeMsg, '#28a745');
+    function parseGradebookCSV(text) {
+        const rows = parseCSV(text);
+        if (rows.length < 2) throw new Error('CSV must contain a header and at least one student.');
+        const headers = rows[0].map(value => value.trim().toLowerCase());
+        if (new Set(headers).size !== headers.length) throw new Error('Duplicate CSV column headers.');
+        const index = names => headers.findIndex(header => names.includes(header));
+        const nameIndex = index(['student', 'name', 'student name', 'full name']);
+        const firstIndex = index(['first name', 'firstname']);
+        const lastIndex = index(['last name', 'lastname']);
+        const idIndex = index(['orgdefinedid', 'org defined id']);
+        const reasons = headers.map((header, i) => ({header, i})).filter(({header}) => ['reason', 'feedback', 'comments', 'notes'].includes(header));
+        if (reasons.length > 1) throw new Error('CSV must have at most one unambiguous feedback column.');
+        const reasonIndex = reasons[0]?.i ?? -1;
+        const grades = headers.map((header, i) => ({header, i})).filter(({header}) =>
+            ['score', 'grade', 'points', 'mark'].includes(header) || /^.+ points grade <numeric maxpoints:\d+(\.\d+)?>$/.test(header));
+        if (grades.length !== 1) throw new Error('CSV needs exactly one unambiguous score/grade column. Export only the target grade item.');
+        const scoreIndex = grades[0].i;
+        const maxMatch = grades[0].header.match(/<numeric maxpoints:(\d+(?:\.\d+)?)>/);
+        const max = maxMatch ? Number(maxMatch[1]) : null;
+        if (max !== null && !Number.isFinite(max)) throw new Error('Invalid grade-item maximum.');
+        if (nameIndex < 0 && (firstIndex < 0 || lastIndex < 0) && idIndex < 0) throw new Error('CSV needs student names or OrgDefinedId.');
+        const db = Object.create(null);
+        for (let i = 1; i < rows.length; i++) {
+            const row = rows[i];
+            if (row.length !== headers.length) throw new Error('CSV row ' + (i + 1) + ' has the wrong number of columns.');
+            const orgId = idIndex >= 0 ? normalizeOrgId(row[idIndex]) : null;
+            if (idIndex >= 0 && !orgId) throw new Error('Missing OrgDefinedId on row ' + (i + 1) + '.');
+            let name = nameIndex >= 0 ? row[nameIndex].trim() : '';
+            if (firstIndex >= 0 && lastIndex >= 0) name = (row[firstIndex].trim() + ' ' + row[lastIndex].trim()).trim();
+            if (!name && (nameIndex >= 0 || firstIndex >= 0 || lastIndex >= 0)) throw new Error('Missing student name on row ' + (i + 1) + '.');
+            const key = orgId ? 'id:' + orgId : 'name:' + normalizeName(name);
+            if (Object.hasOwn(db, key)) throw new Error('Duplicate student identity on row ' + (i + 1) + '. Import blocked without changing the current CSV.');
+            const rawScore = row[scoreIndex].trim();
+            const submitted = rawScore !== '';
+            if (submitted && (!/^\d+(\.\d+)?$/.test(rawScore) || !Number.isFinite(Number(rawScore)))) {
+                throw new Error('Invalid nonblank score on row ' + (i + 1) + '. Only an empty score means unsubmitted.');
+            }
+            if (submitted && max !== null && Number(rawScore) > max) throw new Error('Score exceeds the CSV grade-item maximum on row ' + (i + 1) + '.');
+            db[key] = {name, orgId, score: submitted ? rawScore : null, submitted,
+                reason: reasonIndex >= 0 ? row[reasonIndex].trim() : ''};
+        }
+        return db;
+    }
+
+    function loadCSVFile(event) {
+        stopCruise('CSV import selected; previous operation cancelled.', '#006fbf');
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const ctx = getAssignmentContextKey(), revision = getDatabaseRevision(), token = activeRunToken;
+        if (!ctx) { setStatus('Open an identified course/assignment before importing.', '#d9534f'); return; }
+        if (file.size > 10 * 1024 * 1024) { setStatus('CSV exceeds the 10 MB import limit.', '#d9534f'); return; }
+        const reader = new FileReader();
+        const stillCurrent = () => token === activeRunToken && ctx === getAssignmentContextKey() && revision === getDatabaseRevision();
+        reader.onload = event => {
+            if (!stillCurrent()) return;
+            try {
+                const db = parseGradebookCSV(event.target.result);
+                if (!stillCurrent()) return;
+                // Validate the whole file before committing. New revision invalidates all old progress.
+                saveStudentDatabase(db);
+                clearProcessedMap();
+                updateProgress();
+                setStatus('Loaded ' + Object.keys(db).length + ' CSV rows. No grades were written.', '#198754');
+            } catch (error) { setStatus('CSV import blocked: ' + error.message, '#d9534f'); }
+        };
+        reader.onerror = () => { if (stillCurrent()) setStatus('CSV could not be read. Existing data preserved.', '#d9534f'); };
+        reader.readAsText(file);
     }
 
     function copyCurrentFeedback() {
-        const student = getStudentNameFromPage();
-        const db = getStudentDatabase();
-        const data = findStudentData(student, db, getStudentOrgIdFromPage());
-        if (student && data && data.reason) {
-            navigator.clipboard.writeText(data.reason).then(() => {
-                setStatus(`📋 Copied feedback for ${student} to clipboard!`, '#006fbf');
-            });
-        }
-    }
-
-    // Robust CSV parser supporting quotes, commas within quotes, and multi-line cells
-    function parseCSV(text) {
-        const rows = [];
-        let curRow = [];
-        let curField = '';
-        let inQuotes = false;
-        for (let i = 0; i < text.length; i++) {
-            const c = text[i];
-            const next = text[i + 1];
-            if (c === '"') {
-                if (inQuotes && next === '"') {
-                    curField += '"';
-                    i++;
-                } else {
-                    inQuotes = !inQuotes;
-                }
-            } else if (c === ',' && !inQuotes) {
-                curRow.push(curField.trim());
-                curField = '';
-            } else if ((c === '\r' || c === '\n') && !inQuotes) {
-                if (c === '\r' && next === '\n') i++;
-                curRow.push(curField.trim());
-                if (curRow.some(f => f.length > 0)) rows.push(curRow);
-                curRow = [];
-                curField = '';
-            } else {
-                curField += c;
-            }
-        }
-        if (curField.length > 0 || curRow.length > 0) {
-            curRow.push(curField.trim());
-            if (curRow.some(f => f.length > 0)) rows.push(curRow);
-        }
-        return rows;
+        const identity = pageIdentity();
+        const data = !identity.error && findStudentData(identity.name, getStudentDatabase(), identity.orgId);
+        if (!data || data.ambiguous) { setStatus('Resolve the current student before copying.', '#d9534f'); return; }
+        const token = activeRunToken;
+        navigator.clipboard.writeText(data.reason || '').then(() => {
+            if (token === activeRunToken) setStatus('Feedback copied.', '#006fbf');
+        }).catch(() => { if (token === activeRunToken) setStatus('Clipboard permission denied.', '#d9534f'); });
     }
 
     // Floating Interactive UI Control Panel (100% English)
@@ -1007,7 +953,7 @@
 
             panel.innerHTML = `
                 <div id="bs-panel-hdr" style="background:#006fbf; color:#fff; padding:10px 14px; font-weight:bold; cursor:move; display:flex; justify-content:space-between; align-items:center; border-radius:6px 6px 0 0;">
-                    <span>🎓 Brightspace Feedback & Grade Assistant v1.0</span>
+                    <span>🎓 Brightspace CSV Grade & Feedback Auto-Filler v1.0.3</span>
                     <button id="bs-panel-min" style="background:none; border:none; color:#fff; font-size:16px; cursor:pointer; font-weight:bold;">–</button>
                 </div>
                 <div id="bs-panel-bdy" style="padding:14px;">
@@ -1020,8 +966,8 @@
                     <!-- Progress Bar -->
                     <div style="margin-bottom:8px;">
                         <div style="display:flex; justify-content:space-between; font-size:11px; color:#555; margin-bottom:3px;">
-                            <span>Grading & Skip Progress</span>
-                            <span id="bs-progress-text">Processed: 0 / 0 (0%)</span>
+                            <span>Reload Verification & Skip Progress</span>
+                            <span id="bs-progress-text">Verified: 0 / 0</span>
                         </div>
                         <div style="width:100%; height:8px; background:#e9ecef; border-radius:4px; overflow:hidden;">
                             <div id="bs-progress-bar" style="width:0%; height:100%; background:#28a745; transition:width 0.3s ease;"></div>
@@ -1034,15 +980,15 @@
                     <!-- Options: Rewind & Fast Skip -->
                     <div style="display:flex; flex-direction:column; gap:4px; margin-bottom:8px; font-size:11px; color:#444; background:#f4f9fd; padding:6px 8px; border-radius:4px;">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <label style="display:flex; align-items:center; cursor:pointer; user-select:none;" title="If starting away from first student, automatically rewinds to the start to guarantee full class coverage">
+                            <label style="display:flex; align-items:center; cursor:pointer; user-select:none;" title="If starting away from first student, automatically rewinds to the start and reconciles the imported CSV">
                                 <input type="checkbox" id="bs-chk-rewind" style="margin-right:5px;" ${rewindChecked}>
                                 <span>🎯 Cover entire class (Auto-rewind to start)</span>
                             </label>
                         </div>
                         <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <label style="display:flex; align-items:center; cursor:pointer; user-select:none;" title="Fast skip students with score and feedback already saved">
+                            <label style="display:flex; align-items:center; cursor:pointer; user-select:none;" title="Skip matching published evaluations or reload-verified drafts; never treat this page's unsaved fill as saved">
                                 <input type="checkbox" id="bs-chk-skip" style="margin-right:5px;" ${skipChecked}>
-                                <span>⚡ Skip already evaluated (Fast Cruise)</span>
+                                <span>⚡ Skip matching existing evaluations</span>
                             </label>
                             <button id="bs-btn-reset-cache" style="background:none; border:none; color:#d9534f; cursor:pointer; text-decoration:underline; font-size:11px; padding:0;" title="Clear evaluated history for this assignment">🔄 Reset Cache</button>
                         </div>
@@ -1075,7 +1021,7 @@
                         <button id="bs-btn-fill-now" style="flex:1; padding:8px; background:#007a4d; color:#fff; border:none; border-radius:5px; font-weight:bold; cursor:pointer; font-size:11px;" title="Fill score and feedback only (no save, no navigation)">
                             ⚡ Fill Current [Alt+F]
                         </button>
-                        <button id="bs-btn-save-now" style="flex:1; padding:8px; background:#0d6efd; color:#fff; border:none; border-radius:5px; font-weight:bold; cursor:pointer; font-size:11px;" title="Save draft / update and confirm dialog">
+                        <button id="bs-btn-save-now" style="flex:1; padding:8px; background:#0d6efd; color:#fff; border:none; border-radius:5px; font-weight:bold; cursor:pointer; font-size:11px;" title="Save Draft, then reload to verify (never publishes)">
                             💾 Save Draft
                         </button>
                         <button id="bs-btn-fill-save" style="flex:1; padding:8px; background:#495057; color:#fff; border:none; border-radius:5px; font-weight:bold; cursor:pointer; font-size:11px;" title="Fill and save draft without advancing">
@@ -1096,7 +1042,7 @@
                     </div>
 
                     <div style="font-size:11px; background:#eef5fc; padding:8px; border-radius:5px; margin-bottom:10px; color:#333; line-height:1.4;">
-                        💡 <b>Zero-Miss Coverage</b>: With "Cover entire class" checked, the script automatically rewinds to the first student whenever cruise is started, ensuring 100% roster coverage.
+                        💡 <b>Draft verification</b>: Each save requires a fresh native acknowledgment and page reload readback. Completion covers only the imported CSV; unknown students or mismatches pause the run.
                     </div>
 
                     <hr style="border:0; border-top:1px solid #eee; margin:10px 0;">
@@ -1104,7 +1050,7 @@
                     <!-- CSV Load for Future Homeworks -->
                     <div style="font-size:11px; color:#666; font-weight:bold; margin-bottom:4px;">📁 Load Gradebook CSV (Stored Locally)</div>
                     <input type="file" id="bs-csv-file" accept=".csv" style="font-size:11px; width:100%;">
-                    <div id="bs-csv-stats" style="font-size:10px; color:#888; margin-top:4px;">Currently loaded: Sample data (Please import CSV)</div>
+                    <div id="bs-csv-stats" style="font-size:10px; color:#888; margin-top:4px;">No CSV imported for this assignment</div>
                 </div>
             `;
 
@@ -1135,286 +1081,59 @@
                 minBtn.textContent = (bdy.style.display === 'none') ? '+' : '–';
             });
 
-            // Toggle Skip Processed
-            document.getElementById('bs-chk-skip').addEventListener('change', (e) => {
-                setSkipProcessedPref(e.target.checked);
-                setStatus(e.target.checked ? '⚡ Fast Cruise enabled (skipping evaluated)' : '⚠️ Fast Cruise disabled (will force re-evaluate)', '#006fbf');
+            document.getElementById('bs-chk-skip').addEventListener('change', event => {
+                stopCruise('Skip preference changed; automation paused.');
+                setSkipProcessedPref(event.target.checked);
             });
-
-            // Toggle Auto Rewind
-            document.getElementById('bs-chk-rewind').addEventListener('change', (e) => {
-                setAutoRewindPref(e.target.checked);
-                setStatus(e.target.checked ? '🎯 Class coverage enabled (Auto-rewind to start)' : '⚠️ Class coverage disabled (Cruises forward only)', '#006fbf');
+            document.getElementById('bs-chk-rewind').addEventListener('change', event => {
+                stopCruise('Rewind preference changed; automation paused.');
+                setAutoRewindPref(event.target.checked);
             });
-
-            // Reset Processed Cache & CSV Database
             document.getElementById('bs-btn-reset-cache').addEventListener('click', () => {
-                if (confirm('Clear evaluated history cache and loaded CSV database for this assignment?\n(Does not alter grades already saved in Brightspace)')) {
-                    clearAllAssignmentData();
-                    clearProcessedMap();
-                    processedSet.clear();
-                    updateProgress();
-                    setStatus('🔄 Assignment data & evaluated history cleared!', '#d9534f');
+                stopCruise('Automation paused for cache reset.');
+                if (confirm('Clear this assignment CSV and local verification history? Saved Brightspace grades are not changed.')) {
+                    try { clearAllAssignmentData(); updateProgress(); }
+                    catch (error) { setStatus('Cache reset failed: ' + error.message, '#d9534f'); }
                 }
             });
-
-            // Rewind to First Button
-            document.getElementById('bs-btn-rewind-now').addEventListener('click', async () => {
-                isHalted = false;
-                autoCruiseActive = true;
-                await rewindToFirstStudent();
-                autoCruiseActive = false;
-                setStatus('📍 Arrived at first student in roster!', '#28a745');
-            });
-
-            // Emergency Stop: Invalidate activeRunToken to abort all pending promises
-            const triggerStop = () => {
-                activeRunToken++;
-                isHalted = true;
-                stopCruise('🛑 Automation halted (Emergency Stop)', '#dc3545');
-            };
-            document.getElementById('bs-btn-stop').addEventListener('click', triggerStop);
-
-            // Auto-Cruise Button with Full Roster Auto-Rewind
-            document.getElementById('bs-btn-cruise').addEventListener('click', async () => {
-                isHalted = false;
-                autoCruiseActive = !autoCruiseActive;
-                const cruiseBtn = document.getElementById('bs-btn-cruise');
-                if (autoCruiseActive) {
-                    activeRunToken++;
-                    const currentToken = activeRunToken;
-                    isProcessingCurrent = false;
-                    currentProcessingStudent = null;
-                    wrapAroundPasses = 0;
-                    cruiseBtn.textContent = '⏸️ Auto-Cruising... (Click to Pause)';
-                    cruiseBtn.style.background = '#dc3545';
-
-                    // If enabled and not at first student, automatically rewind to start first!
-                    if (getAutoRewindPref() && !isAtFirstStudent()) {
-                        setStatus('⏪ Not at start of roster. Auto-rewinding to first student...', '#006fbf');
-                        await rewindToFirstStudent();
-                        if (isHalted || !autoCruiseActive) return;
-                        setStatus('📍 At first student. Starting full class auto-cruise!', '#198754');
-                    } else {
-                        setStatus('🚀 Starting Auto-Cruise...', '#198754');
-                    }
-
-                    cruiseStep(currentToken);
-                    if (!cruiseInterval) {
-                        cruiseInterval = setInterval(() => cruiseStep(currentToken), 2000);
-                    }
-                } else {
-                    stopCruise('⏸️ Auto-Cruise paused', '#006fbf');
-                }
-            });
-
-            // Manual Step: Fill Current Only
-            document.getElementById('bs-btn-fill-now').addEventListener('click', () => {
-                isHalted = false;
-                executeFill(true);
-            });
-
-            // Manual Step: Save Current Only
-            document.getElementById('bs-btn-save-now').addEventListener('click', async () => {
-                const saveOk = triggerSave();
-                setStatus(saveOk ? '💾 Save Draft/Update triggered...' : '⚠️ Save button not found', saveOk ? '#0d6efd' : '#d9534f');
-                await sleep(1000);
-                autoConfirmDialog();
-            });
-
-            // Manual Step: Fill and Save
-            document.getElementById('bs-btn-fill-save').addEventListener('click', async () => {
-                activeRunToken++;
-                const currentToken = activeRunToken;
-                isHalted = false;
-                const fillOk = executeFill(false);
-                if (fillOk) {
-                    setStatus('✔ Filled, saving draft...', '#007a4d');
-                    await sleep(600);
-                    if (currentToken !== activeRunToken || isHalted) return;
-                    triggerSave();
-                    await sleep(1000);
-                    if (currentToken !== activeRunToken || isHalted) return;
-                    autoConfirmDialog();
-                    setStatus('✔ Filled and saved successfully!', '#28a745');
-                }
-            });
-
-            // Manual Step: Prev Only
-            document.getElementById('bs-btn-prev-only').addEventListener('click', () => {
-                const res = deepClickPrev();
-                setStatus(res === 'CLICKED' ? '◀️ Triggered Previous Student...' : (res === 'DISABLED' ? '⚠️ Already at first student' : '⚠️ Previous button not found'), '#6c757d');
-            });
-
-            // Manual Step: Next Only
-            document.getElementById('bs-btn-next-only').addEventListener('click', () => {
-                const res = deepClickNext();
-                setStatus(res === 'CLICKED' ? 'Next ▶️ Triggered Next Student...' : (res === 'DISABLED' ? '⚠️ Already at last student' : '⚠️ Next button not found'), '#6c757d');
-            });
-
-            // Copy Feedback
+            document.getElementById('bs-btn-stop').addEventListener('click', () => stopCruise('Stopped. A save already sent cannot be undone by Stop.'));
+            document.getElementById('bs-btn-cruise').addEventListener('click', startCruise);
+            for (const [id, action] of [
+                ['bs-btn-fill-now', 'fill'], ['bs-btn-save-now', 'save'], ['bs-btn-fill-save', 'fill-save'],
+                ['bs-btn-rewind-now', 'first'], ['bs-btn-prev-only', 'previous'], ['bs-btn-next-only', 'next']
+            ]) document.getElementById(id).addEventListener('click', () => manualAction(action));
             document.getElementById('bs-btn-copy').addEventListener('click', copyCurrentFeedback);
-
-            // Global Hotkeys: Alt+S (Stop), Alt+A (Cruise), Alt+F (Fill), Alt+H (Rewind to First), Alt+Left (Prev), Alt+Right (Next)
-            window.addEventListener('keydown', (e) => {
-                if (e.altKey && e.code === 'KeyS') {
-                    e.preventDefault();
-                    triggerStop();
-                } else if (e.altKey && e.code === 'KeyA') {
-                    e.preventDefault();
-                    document.getElementById('bs-btn-cruise').click();
-                } else if (e.altKey && e.code === 'KeyF') {
-                    e.preventDefault();
-                    document.getElementById('bs-btn-fill-now').click();
-                } else if (e.altKey && e.code === 'KeyH') {
-                    e.preventDefault();
-                    document.getElementById('bs-btn-rewind-now').click();
-                } else if (e.altKey && e.code === 'ArrowRight') {
-                    e.preventDefault();
-                    document.getElementById('bs-btn-next-only').click();
-                } else if (e.altKey && e.code === 'ArrowLeft') {
-                    e.preventDefault();
-                    document.getElementById('bs-btn-prev-only').click();
-                }
-            });
-
-            // CSV Load for future assignments (Multi-format & D2L export resilient)
-            document.getElementById('bs-csv-file').addEventListener('change', (e) => {
-                const f = e.target.files[0];
-                if (!f) return;
-                const r = new FileReader();
-                r.onload = (ev) => {
-                    const rows = parseCSV(ev.target.result);
-                    if (rows.length < 2) return;
-                    
-                    const headers = rows[0].map(h => h.toLowerCase().trim());
-                    
-                    let lI = headers.findIndex(h => h === 'last name' || h.includes('last name') || h === 'lastname');
-                    let fI = headers.findIndex(h => h === 'first name' || h.includes('first name') || h === 'firstname');
-                    let oI = headers.findIndex(h => h.includes('orgdefinedid') || h.includes('org defined id') || h === 'id' || h.includes('student id') || h.includes('emplid'));
-                    let nI = -1;
-                    if (lI === -1 || fI === -1) {
-                        nI = headers.findIndex(h => h === 'student' || h === 'name' || h === 'student name' || h === 'full name' || h.includes('student') || h.includes('name'));
-                    }
-                    let sI = headers.findIndex(h => h.includes('score') || h.includes('grade') || h.includes('points') || h.includes('mark'));
-                    let rI = headers.findIndex(h => h.includes('reason') || h.includes('feedback') || h.includes('comment') || h.includes('notes'));
-
-                    if (sI === -1) {
-                        alert('⚠️ CSV Import Error: No Grade/Score column detected! The CSV must include a column named "Score", "Grade", or "Points".');
-                        return;
-                    }
-
-                    const stagedDb = {};
-                    const unsubmittedList = [];
-                    const duplicateNames = [];
-                    for (let i = 1; i < rows.length; i++) {
-                        const row = rows[i];
-                        let name = '';
-                        if (lI !== -1 && fI !== -1 && row[lI] && row[fI]) {
-                            name = `${row[fI]} ${row[lI]}`.trim();
-                        } else if (nI !== -1 && row[nI]) {
-                            name = row[nI].trim();
-                            if (name.includes(',') && !name.includes(';')) {
-                                const parts = name.split(',').map(p => p.trim()).filter(Boolean);
-                                if (parts.length === 2) {
-                                    name = `${parts[1]} ${parts[0]}`;
-                                }
-                            }
-                        }
-
-                        if (name) {
-                            if (stagedDb[name]) {
-                                duplicateNames.push(name);
-                            }
-                            const rawScore = (sI !== -1 && row[sI] !== undefined) ? row[sI].trim() : '';
-                            const re = (rI !== -1 && row[rI] !== undefined) ? row[rI].trim() : '';
-                            
-                            // Validate numeric sanity (strictly decimal/float >= 0)
-                            let isSubmitted = false;
-                            let validatedScore = null;
-                            if (rawScore !== '' && rawScore.toLowerCase() !== 'null' && rawScore.toLowerCase() !== 'none') {
-                                if (/^\d+(\.\d+)?$/.test(rawScore)) {
-                                    isSubmitted = true;
-                                    validatedScore = rawScore;
-                                } else {
-                                    console.warn(`[D2L-AutoFeedback] Non-numeric or invalid score "${rawScore}" for student "${name}". Treated as unsubmitted.`);
-                                }
-                            }
-                            
-                            const rawOrgId = (oI !== -1 && row[oI]) ? row[oI].replace(/^#/, '').trim() : null;
-                            stagedDb[name] = {
-                                score: validatedScore,
-                                reason: re || (isSubmitted ? '' : 'No submission'),
-                                submitted: isSubmitted,
-                                orgId: rawOrgId
-                            };
-                            if (!isSubmitted) {
-                                unsubmittedList.push(name);
-                            }
-                        }
-                    }
-
-                    if (duplicateNames.length > 0) {
-                        alert(`❌ CSV Import Blocked: Detected ${duplicateNames.length} duplicate student name(s) in CSV:\n- ${duplicateNames.slice(0, 5).join('\n- ')}\n\nTo prevent grade overwriting, each student name in the CSV must be unique.`);
-                        return; // HARD BLOCK: zero side effects!
-                    }
-
-                    // Reset previous progress map and in-memory set when a new CSV is imported
-                    const ctx = getAssignmentContextKey();
-                    try {
-                        localStorage.removeItem(`d2l_processed_map_${ctx}`);
-                    } catch(e) {}
-                    processedSet.clear();
-
-                    // Safely commit unsubmitted marks and database
-                    for (const un of unsubmittedList) {
-                        markStudentProcessed(un, { unsubmitted: true, source: 'csv_unsubmitted' });
-                    }
-
-                    saveStudentDatabase(stagedDb);
-                    document.getElementById('bs-csv-stats').textContent = `Loaded ${Object.keys(stagedDb).length} students from ${f.name} (Stored locally)`;
-                    updateProgress();
-                    setStatus(`✔ Loaded ${Object.keys(stagedDb).length} students successfully!`, '#28a745');
-                };
-                r.readAsText(f);
+            document.getElementById('bs-csv-file').addEventListener('change', loadCSVFile);
+            window.addEventListener('keydown', event => {
+                if (!event.altKey) return;
+                const keys = {KeyS: 'bs-btn-stop', KeyA: 'bs-btn-cruise', KeyF: 'bs-btn-fill-now',
+                    KeyH: 'bs-btn-rewind-now', ArrowLeft: 'bs-btn-prev-only', ArrowRight: 'bs-btn-next-only'};
+                if (keys[event.code]) { event.preventDefault(); document.getElementById(keys[event.code]).click(); }
             });
         }
 
         function updateUIPolling() {
             buildUI();
-
+            if (activeOperation) guardOperation(activeOperation);
+            const identity = pageIdentity();
             const db = getStudentDatabase();
-            const student = getStudentNameFromPage();
-            const stuEl = document.getElementById('bs-curr-student');
-            const prevEl = document.getElementById('bs-curr-preview');
-            if (!stuEl || !prevEl) return;
-
-            if (student) {
-                const data = findStudentData(student, db, getStudentOrgIdFromPage());
-                if (data) {
-                    if (data.submitted === false || data.score === null || data.score === '') {
-                        stuEl.textContent = `${student} (Unsubmitted - Auto skip)`;
-                        stuEl.style.color = '#e67e22';
-                        prevEl.textContent = '⚠️ This student did not submit an assignment (Will be auto-skipped during cruise).';
-                    } else {
-                        stuEl.textContent = student;
-                        stuEl.style.color = '#007a4d';
-                        prevEl.textContent = `[Score: ${data.score}] ${data.reason}`;
-                    }
-                } else {
-                    stuEl.textContent = `${student} (Not in database)`;
-                    stuEl.style.color = '#888';
-                    prevEl.textContent = 'This student is not in the loaded database (Will be auto-skipped). Import a CSV with this student below.';
-                }
-            } else {
-                stuEl.textContent = 'No student detected on page';
-                stuEl.style.color = '#888';
-                prevEl.textContent = 'Please navigate to a student evaluation page (Consistent Evaluation).';
+            const data = identity.error ? {ambiguous: true, error: identity.error} : findStudentData(identity.name, db, identity.orgId);
+            const student = document.getElementById('bs-curr-student');
+            const preview = document.getElementById('bs-curr-preview');
+            if (student) student.textContent = identity.name || identity.orgId || 'No student identified';
+            if (preview) {
+                preview.textContent = data?.ambiguous ? data.error : !data ? 'No matching CSV row.'
+                    : data.submitted === false ? 'Explicitly unsubmitted (blank score): no grade will be written.'
+                    : '[' + data.matchedBy + '] Score: ' + data.score + ' | ' + (data.reason || '(score only)');
             }
+            const stats = document.getElementById('bs-csv-stats');
+            if (stats) stats.textContent = 'Current CSV: ' + Object.keys(db).length + ' rows | ' +
+                (getAssignmentContextKey() || 'unknown assignment') + (getDatabaseRevision() ? '' : ' | Import required (old caches are not trusted)');
             updateProgress();
+            if (!restoreStarted) { restoreStarted = true; restorePendingReadback(); }
         }
 
+        updateUIPolling();
         setInterval(updateUIPolling, 1000);
     }
-
 })();
