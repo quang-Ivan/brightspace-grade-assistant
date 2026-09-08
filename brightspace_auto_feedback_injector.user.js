@@ -5,6 +5,8 @@
 // @description  A time-saving tool for TAs: fill Brightspace assignment grades and personalized feedback from CSV. Free, open-source, and no third-party uploads.
 // @author       quang-Ivan
 // @license      MIT
+// @homepageURL  https://quang-ivan.github.io/brightspace-grade-assistant/
+// @supportURL   https://github.com/quang-Ivan/brightspace-grade-assistant/issues
 // @match        *://*/d2l/*
 // @match        *://*/*activities/iterator/*
 // @run-at       document-idle
