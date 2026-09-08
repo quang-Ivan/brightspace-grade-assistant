@@ -1,6 +1,6 @@
 {
   "name": "brightspace-grade-assistant",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "private": true,
   "description": "Local verification tooling for Brightspace (D2L) CSV Grade & Feedback Auto-Filler",
   "license": "MIT",

@@ -4,7 +4,7 @@
 
 You install **one small file**, [`brightspace_auto_feedback_injector.user.js`](../brightspace_auto_feedback_injector.user.js), using Violentmonkey or Tampermonkey. You do not need to learn programming, download the whole project, or install Node, npm, or Git.
 
-For a quick overview, see the [project README](../README.md) or [watch the fictional-data demo](https://quang-Ivan.github.io/brightspace-grade-assistant/#demo). This guide walks through installing v1.0.3, preparing a CSV, and using the helper one student at a time.
+For a quick overview, see the [project README](../README.md) or [watch the fictional-data demo](https://quang-Ivan.github.io/brightspace-grade-assistant/#demo). This guide walks through installing v1.0.4, preparing a CSV, and using the helper one student at a time.
 
 ## Before you start: is this the right tool for your task?
 
@@ -56,7 +56,7 @@ Once it is available:
 2. Copy the entire file, from `// ==UserScript==` through the last line.
 3. Open your userscript manager's dashboard. In Violentmonkey, use **+ → Create a new script**; in Tampermonkey, choose **Create a new script**.
 4. Replace the editor's example text with the code you copied. Use Ctrl+A / Ctrl+V on Windows, or Command+A / Command+V on a Mac.
-5. Save in the editor. Confirm **Brightspace (D2L) CSV Grade & Feedback Auto-Filler**, version **1.0.3**, is enabled.
+5. Save in the editor. Confirm **Brightspace (D2L) CSV Grade & Feedback Auto-Filler**, version **1.0.4**, is enabled.
 6. Disable older copies, then refresh Brightspace.
 
 Neither method requires downloading the whole repository or installing developer tools.
@@ -67,7 +67,7 @@ Neither method requires downloading the whole repository or installing developer
 2. Open the course, then **Assignments**, then the assignment you intend to grade.
 3. Click one student's name or **Go to Evaluation**.
 4. Check that you can see that student's name, **Overall Grade**, and **Overall Feedback**.
-5. Refresh the page. The helper panel should show **Brightspace CSV Grade & Feedback Auto-Filler v1.0.3** and the same student's name.
+5. Refresh the page. The helper panel should show **Brightspace CSV Grade & Feedback Auto-Filler v1.0.4** and the same student's name.
 
 The class submission list is not the individual evaluation page. If the panel says **No student identified**, do not import a file or start filling there; open a student's evaluation first. Likewise, import on the evaluation page where you will work, not on the course home or Grades page.
 
@@ -90,7 +90,7 @@ These are fictional examples for an assignment marked out of 8. Replace the exam
 - **student:** use the name displayed on the student's Brightspace evaluation page. Keep one row per student. If two students share a name, do not guess which row will match; see the [student-ID instructions](IN_DEPTH_GUIDE.md#using-student-ids).
 - **score:** enter points, not a percentage. For 7 points out of 8, enter `7`, not `87.5` or `7/8`. Use a decimal point, such as `7.5`.
 - **An empty score means skip this student automatically.** Keep the student's name or ID in the row and leave the score cell empty for a non-submission. Auto-Cruise continues without entering a grade or feedback and without saving that evaluation. It is not the same as `0`: zero is a real grade and will be entered.
-- A completely empty line is ignored. A student with no matching CSV row causes Auto-Cruise to pause; check for a missing row or a name/ID mismatch. Neither case is the same as a named student with an empty score.
+- A completely empty line is ignored. If the current roster student has neither a matching supported ID nor a matching name in the CSV, Auto-Cruise skips it without filling or saving and records it separately as **Outside CSV**. Outside CSV is not unsubmitted or graded and does not count toward CSV completion. A name match with a conflicting ID or an ambiguous identity still pauses. Neither case is the same as a named student with an empty score.
 - **reason:** the written feedback you want the student to receive. An empty feedback cell leaves existing feedback unchanged; it does not erase it. Use the feedback language required by your course; the helper copies your text rather than translating it.
 - When using a spreadsheet app, keep the feedback in one cell even if it contains commas or line breaks; CSV export handles those characters. If you edit CSV by hand, put such feedback in double quotes and double any quotation marks inside it.
 
@@ -125,8 +125,8 @@ If you filled incorrect values and want to discard them, stop the helper and use
 
 Once the one-student save works on your assignment:
 
-1. Make sure your file covers the students you intend to process. For a partial set of students, use manual controls; an automatic run stops when it reaches a student absent from the file.
-2. **Cover entire class (Auto-rewind to start)** moves to the beginning of Brightspace's current student list before starting. Leave it on for a full-list run; turn it off to begin at the current student. It does not change Brightspace's filters or add missing rows to your CSV.
+1. Make sure your file covers the students you intend to process. Auto-Cruise also supports a partial CSV: it can move through a longer Brightspace roster, skip pages that are **Outside CSV**, and continue toward the imported rows. Keep the run open so it can finish its bounded traversal.
+2. **Cover entire class (Auto-rewind to start)** moves to the beginning of Brightspace's current student list before starting. Leave it on when the intended rows may be anywhere in the current list; turn it off to begin at the current student. It does not change Brightspace's filters or add missing rows to your CSV.
 3. **Skip matching existing evaluations** skips a published evaluation, or a draft this helper previously saved and checked, only when its current grade and any feedback supplied in your file match. A matching score alone is not enough when your file also contains feedback. A just-filled, unsaved entry is not treated as an existing match.
 4. Click **Start Full Class Auto-Cruise**. This means the helper works through students one at a time. Keep the tab open and avoid navigating, editing fields, or switching assignments during the run.
 5. Use **Emergency Stop** if you need to interrupt it. No further automated actions should follow, but it cannot recall a request already sent to Brightspace.
@@ -137,9 +137,10 @@ The progress labels have different meanings:
 | --- | --- |
 | Drafts verified | The helper saved a draft, refreshed, and found the expected values again. |
 | Existing matched | The existing values matched your file, so the helper skipped them without a new save. |
-| Unsubmitted | The CSV score was empty; the helper did not enter a grade. |
+| Unsubmitted | A named CSV row had an explicitly empty score; the helper did not enter a grade or save that evaluation. |
+| Outside CSV | The current roster student matched neither a supported CSV ID nor a CSV name; the helper did not enter a grade or save that evaluation. This count is separate from unsubmitted and is not part of CSV completion. |
 
-Completion refers to the imported rows, not proof that every student in the course was graded. Review any remaining rows. Publish results separately using Brightspace only after you are satisfied with the evaluations.
+Completion refers to all intended imported CSV rows, not proof that every student in the course was graded. **Outside CSV** pages do not contribute to the CSV completion numerator or denominator. If an intended row is missing from the roster, or a roster/file identity is wrong, the intended row remains unaccounted for and the helper must not report false completion. Review any remaining rows and the Outside CSV count. Publish results separately using Brightspace only after you are satisfied with the evaluations.
 
 ## Troubleshooting: what to check next
 
@@ -147,7 +148,7 @@ Completion refers to the imported rows, not proof that every student in the cour
 | --- | --- |
 | No helper panel | Check that Tampermonkey and this script are enabled, Chrome permits user scripts, and Tampermonkey has access to your Brightspace site. Refresh an individual assignment evaluation page. |
 | No student identified | Open one student's evaluation, not the class list, course home, or Grades page. |
-| No matching CSV row | Compare the displayed student name with your file. Check that you imported the file for this assignment on the evaluation page. Do not rename a different student's row to force a match. |
+| No matching CSV row | If neither the displayed name nor a supported page ID matches a CSV row, Auto-Cruise records **Outside CSV**, skips the page without filling or saving, and continues. Review that count afterward; it is not unsubmitted or graded. If the name matches a row but the exposed ID conflicts, or identity is ambiguous, the helper pauses. Do not rename a different student's row to force a match. |
 | Duplicate identity or name is not unique | Check for repeated rows or two students with the same name. Resolve the identity issue using the official roster; do not let the helper guess. |
 | Invalid score or column error | Keep one grade column. Use a number such as `7.5`, not `7/8`, `90%`, `N/A`, or a formula error. Save as comma-delimited CSV and import again. |
 | An Update action is present | The evaluation is already published and cannot be saved as a draft by this version. A difference from your file needs separate review, not another press of Start. |
@@ -161,7 +162,7 @@ Other browsers, translated Brightspace interfaces, and different evaluation layo
 
 If installed from Greasy Fork, use your manager's normal update check. If installed by copying the source, open the existing script in the manager, replace its entire code, save, and refresh Brightspace. Confirm the version in the helper panel and keep only one copy enabled.
 
-**Reset Cache** clears the helper's imported file and local progress for the current assignment; it does not remove or undo Brightspace grades. Stop any run before using it, then import the correct file again.
+**Reset Cache** clears the helper's imported file, local progress, and **Outside CSV** history for the current assignment; it does not remove or undo Brightspace grades. Stop any run before using it, then import the correct file again. Reimporting a CSV likewise starts a fresh current-revision Outside CSV count.
 
 **No tracking or third-party uploads.** The script has no separate account, server, analytics service, or direct data-sending code. It reads your CSV locally and operates Brightspace's existing fields and buttons; Brightspace itself handles sending and saving grades.
 

@@ -6,6 +6,8 @@ The initial v1.0.1 simulation and subsequent bounded live-page checks were perfo
 
 `npm ci --ignore-scripts --no-audit --no-fund` passed for the initial environment; `npm run check` and all 34 tests passed for v1.0.3. Tests execute the production core in jsdom with controlled timers. Only panel mounting and the platform reload primitive are substituted; the separate browser exercise below uses the complete, unmodified userscript.
 
+For v1.0.4, `npm run check` and all 40 regression tests passed. Added coverage verifies separate outside-CSV accounting, persistence across documents, revisit deduplication, reset on a new CSV or cache clear, Stop/restart cancellation during a skip, continued conflict rejection, and completion that cannot hide an imported student missing from the roster. A one-row CSV successfully rewinds and traverses a forty-student simulated roster without the old CSV-size-based early stop.
+
 Coverage includes strict CSV parsing and whole-file validation, zero versus empty scores, duplicate IDs and normalized names, conflicting page identities, scoped controls, escaped multiline feedback, exact Save Draft selection, unsupported published controls, dialogs, stale acknowledgements, Stop/restart races, CSV/context changes, full-reload recovery, mismatched persisted values, storage failure, and canonical progress accounting.
 
 ## Real-browser local simulation
@@ -43,6 +45,14 @@ The complete network observation for that fill-and-start check contained two gra
 A separate navigation-and-fast-skip check moved to an existing matching published evaluation, skipped it, and paused on the next evaluation's feedback mismatch. The complete network observation for this separate check contained no non-read requests. No new grade or feedback values were entered during that check.
 
 The assignment roster was then rechecked: 39 students, 36 evaluations marked Published. An opened published evaluation had one Update button and no Save Draft button. The browser session and real student records were available; the missing first-save test case was an appropriate unpublished submission. No grades were entered or saved during this roster recheck.
+
+## v1.0.4 partial-CSV browser workload
+
+The complete v1.0.4 userscript ran in an isolated Chromium session against the same six-student local fixture, with a four-row CSV. Two roster students were deliberately omitted from the CSV, one included student had an empty score, and three included students had grades of 0, 88, and 100.
+
+Auto-Cruise completed with **3 reload-verified drafts, 1 explicitly unsubmitted skip, 2 outside-CSV skips, and 0 CSV rows remaining**. The local server received exactly three save requests, all for the intended graded students; neither omitted student nor the empty-score student received a save request. The zero score and escaped feedback persisted correctly, the unrelated rubric feedback stayed unchanged, and outside-CSV counts survived the draft-save page reloads without entering the CSV completion numerator or denominator.
+
+This is local browser evidence, not an additional live Brightspace save test. The earlier live-page findings above remain scoped to their stated versions.
 
 ## Remaining acceptance boundary
 

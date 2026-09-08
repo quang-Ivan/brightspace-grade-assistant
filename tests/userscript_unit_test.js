@@ -26,7 +26,8 @@ test('only empty scores mean unsubmitted; invalid nonblank or nonfinite values b
     for (const value of ['95abc', '0x10', '-10', '1e2', 'Infinity', 'NaN', 'null', 'none', '9'.repeat(400)]) {
         assert.throws(() => h.api.parseGradebookCSV('student,score\nAlice,' + value), /Invalid nonblank/);
     }
-    const rows = h.api.parseGradebookCSV('student,score\nAlice,0\nBob,\nCharlie,88.5');
+    const rows = h.api.parseGradebookCSV('student,score\nAlice,0\n\n,\nBob,\nCharlie,88.5');
+    assert.equal(Object.keys(rows).length, 3);
     assert.equal(rows['name:alice'].submitted, true);
     assert.equal(rows['name:alice'].score, '0');
     assert.equal(rows['name:bob'].submitted, false);
@@ -58,6 +59,8 @@ test('explicit page ID mismatch and conflicting name/ID never fall back silently
     const h = fixture(t);
     const db = h.api.parseGradebookCSV('student,OrgDefinedId,score\nAlice Smith,001,95\nBob Jones,002,77');
     assert.equal(h.api.findStudentData('Alice Smith', db, '999').ambiguous, true);
+    assert.equal(h.api.findStudentData('Outside Student', db, '999'), null);
+    assert.equal(h.api.findStudentData('Outside Student', db, null), null);
     assert.equal(h.api.findStudentData('Alice Smith', db, '002').ambiguous, true);
     assert.equal(h.api.findStudentData('Page Alias', db, '002').key, 'id:002');
     assert.equal(h.api.findStudentData('Alice Smith', db, null).matchedBy, 'unique name');
@@ -326,11 +329,94 @@ test('progress uses canonical CSV IDs even when page names are aliases', async t
     assert.deepEqual(Object.keys(reloaded.api.getProcessedMap()), ['id:001']);
 });
 
-test('unknown student is not recorded as unsubmitted or advanced', async t => {
-    const h = fixture(t, {name: 'Other Student', orgId: null}); h.importCSV(CSV);
-    const op = h.api.beginOperation('cruise'); await h.api.runCruise(op);
-    assert.equal(Object.keys(h.api.getProcessedMap()).length, 0);
-    assert.equal(h.nextClicks, 0); assert.match(h.status(), /not in this CSV/);
+test('outside-CSV students advance untouched and are separate from named blank-score skips', async t => {
+    for (const orgId of [null, '999']) {
+        const h = fixture(t, {name: 'Other Student', orgId, score: '42', feedback: '<p>Keep this feedback</p>'});
+        h.importCSV('student,OrgDefinedId,score,reason\nAlice Smith,001,,Do not write this');
+        h.save.textContent = 'Update';
+        h.onNext = () => { h.setStudent('Alice Smith', '001', true); h.next.disabled = true; };
+        const run = h.api.startCruise(); await h.advance(2000); await run;
+        assert.equal(h.nextClicks, 1); assert.equal(h.saveClicks, 0); assert.equal(h.reloads, 0);
+        assert.equal(h.grade.value, '42'); assert.equal(h.editor.html, '<p>Keep this feedback</p>');
+        const progress = h.api.progressSummary();
+        assert.equal(progress.total, 1); assert.equal(progress.skipped, 1); assert.equal(progress.outsideCsv, 1);
+        assert.equal(progress.verified, 0); assert.equal(progress.matched, 0); assert.equal(progress.remaining.length, 0);
+        assert.deepEqual(Object.keys(h.api.getProcessedMap()), ['id:001']);
+        assert.equal(h.w.document.getElementById('bs-progress-bar').style.width, '100%');
+        assert.match(h.status(), /1 explicitly unsubmitted; 1 outside CSV skipped/);
+    }
+});
+
+test('outside-CSV count survives a fresh document, deduplicates revisits, and resets with CSV or cache', async t => {
+    const h = fixture(t, {name: 'Other Student', orgId: '999'}); h.importCSV(CSV);
+    let step = h.api.cruiseStep(h.api.beginOperation('cruise')); await h.advance(300); await step;
+    assert.equal(h.api.progressSummary().outsideCsv, 1); h.api.stopCruise();
+    const reloaded = fixture(t, {local: h.local, name: 'Other Student', orgId: '999', navigationType: 'reload'});
+    assert.equal(reloaded.api.progressSummary().outsideCsv, 1);
+    step = reloaded.api.cruiseStep(reloaded.api.beginOperation('cruise')); await reloaded.advance(300); await step;
+    assert.equal(reloaded.api.progressSummary().outsideCsv, 1);
+    reloaded.api.stopCruise(); reloaded.importCSV(CSV);
+    assert.equal(reloaded.api.progressSummary().outsideCsv, 0);
+    step = reloaded.api.cruiseStep(reloaded.api.beginOperation('cruise')); await reloaded.advance(300); await step;
+    assert.equal(reloaded.api.progressSummary().outsideCsv, 1);
+    reloaded.api.clearAllAssignmentData();
+    assert.equal(reloaded.api.progressSummary().outsideCsv, 0);
+});
+
+test('Stop during an outside-CSV skip cannot navigate or stop a restarted operation', async t => {
+    const h = fixture(t, {name: 'Other Student', orgId: '999'}); h.importCSV(CSV);
+    const old = h.api.runCruise(h.api.beginOperation('cruise'));
+    await h.flush(); h.api.stopCruise(); const current = h.api.beginOperation('manual');
+    await h.advance(1000); await old;
+    assert.equal(h.nextClicks, 0); assert.equal(h.saveClicks, 0);
+    assert.equal(h.api.operation(), current);
+});
+
+test('identity conflicts still pause cruise rather than becoming outside-CSV skips', async t => {
+    for (const orgId of ['999', '002']) {
+        const h = fixture(t, {orgId});
+        h.importCSV(CSV + '\nBob Jones,002,77,Other feedback');
+        await h.api.runCruise(h.api.beginOperation('cruise'));
+        assert.equal(h.nextClicks, 0); assert.equal(h.saveClicks, 0); assert.equal(h.grade.value, '');
+        assert.equal(h.api.progressSummary().outsideCsv, 0);
+        assert.match(h.status(), /conflicts|different CSV records/);
+    }
+});
+
+test('outside-CSV skips cannot hide an imported row missing from the roster or claim completion', async t => {
+    const h = fixture(t, {name: 'Other Student', orgId: '999'}); h.importCSV(CSV);
+    h.local.setItem('d2l_auto_rewind_pref', 'false'); h.next.disabled = true;
+    const run = h.api.startCruise(); await h.advance(1000); await run;
+    assert.equal(h.api.progressSummary().outsideCsv, 1);
+    assert.equal(h.api.progressSummary().remaining.length, 1);
+    assert.equal(h.api.progressSummary().skipped, 0);
+    assert.equal(h.w.document.getElementById('bs-progress-bar').style.width, '0%');
+    assert.equal(h.saveClicks, 0); assert.match(h.status(), /CSV rows remain unverified: Alice Smith/);
+    assert.doesNotMatch(h.status(), /CSV complete/);
+});
+
+test('one-row CSV can rewind and traverse a forty-student roster without early navigation limits', async t => {
+    const h = fixture(t); h.importCSV('student,OrgDefinedId,score\nAlice Smith,001,');
+    let index = 39;
+    const show = () => {
+        h.setStudent(index === 39 ? 'Alice Smith' : 'Outside Student ' + index,
+            index === 39 ? '001' : 'outside-' + index, true);
+        h.previous.disabled = index === 0; h.next.disabled = index === 39;
+    };
+    h.onPrevious = () => { index--; show(); }; h.onNext = () => { index++; show(); }; show();
+    const run = h.api.startCruise(); await h.advance(60000); await run;
+    assert.equal(h.previousClicks, 39); assert.equal(h.nextClicks, 39); assert.equal(h.saveClicks, 0);
+    assert.equal(h.api.progressSummary().outsideCsv, 39); assert.equal(h.api.progressSummary().skipped, 1);
+    assert.equal(h.api.progressSummary().total, 1); assert.match(h.status(), /CSV complete/);
+});
+
+test('manual Fill Current still refuses a student absent from the CSV', async t => {
+    const h = fixture(t, {name: 'Other Student', orgId: '999', score: 42, feedback: '<p>Keep</p>'});
+    h.importCSV(CSV); await h.api.manualAction('fill');
+    assert.equal(h.grade.value, '42'); assert.equal(h.editor.html, '<p>Keep</p>');
+    assert.equal(h.nextClicks, 0); assert.equal(h.saveClicks, 0);
+    assert.equal(h.api.progressSummary().outsideCsv, 0);
+    assert.match(h.status(), /not in this CSV/);
 });
 
 test('whole-file validation has zero database/progress side effects; valid reimport invalidates old progress', t => {

@@ -1,6 +1,6 @@
 # In-Depth Guide: Brightspace (D2L) CSV Grade & Feedback Auto-Filler
 
-> Technical reference for v1.0.3. For installation and everyday use, start with the [step-by-step user guide](USER_GUIDE.md).
+> Technical reference for v1.0.4. For installation and everyday use, start with the [step-by-step user guide](USER_GUIDE.md).
 
 This advanced guide explains student matching, local state, CSV validation, and the verified-save state machine. Brightspace layouts and controls can differ by institution and course configuration.
 
@@ -65,6 +65,8 @@ Rows are staged before the existing local database or progress state is replaced
 - a no-ID file must have unique names after the script's normalization;
 - a blank score explicitly marks an unsubmitted row. It is not an invalid score and is not a reason to write a grade.
 
+Completely empty CSV lines identify no student and are ignored. They do not create an unsubmitted row or a completion obligation.
+
 Identical display names are allowed when distinct supported IDs disambiguate them. If an ID is genuinely absent on the page, the script may use a unique normalized name. It must not fall back to a name when an ID is present but mismatched or when multiple records remain possible.
 
 ### Using student IDs
@@ -98,6 +100,8 @@ OrgDefinedId,Last Name,First Name,Target Points Grade <Numeric MaxPoints:100>,Fe
 
 The grade-item header in the second example is illustrative. For a real task, preserve the exact header from the current course export. A file containing `Feedback` is userscript input, not automatically a valid native Brightspace Gradebook import.
 
+During Auto-Cruise, a page student whose supported ID and normalized name both fail to match every imported row is classified as **Outside CSV**. The helper skips that page without filling or saving, does not mark it unsubmitted or graded, and tracks it separately from imported-row progress. A name match with a conflicting ID, an ambiguous identity, or another genuine identity conflict still pauses; an Outside CSV classification applies only when there is no matching identity at all.
+
 ### Plaintext feedback and CSV escaping
 
 `Reason`/`Feedback` is treated as plaintext. Commas, quotes, and line breaks must follow ordinary CSV quoting rules. The userscript escapes special characters before placing the text into the Brightspace editor and preserves line breaks. HTML is not an input language: markup-looking text is displayed as text rather than interpreted as arbitrary markup.
@@ -111,7 +115,7 @@ Note for improvement: show the intermediate calculation on the next revision."
 
 ### Revision scope
 
-Local progress and verified records are scoped by course, assignment, and CSV revision. Changing any of those inputs, or upgrading from the older cache/record contract, requires importing the real task CSV again. The sample file is documentation only; no default sample database may write grades.
+Local progress, verified records, and the **Outside CSV** count are scoped by course, assignment, and CSV revision. Reimporting a CSV starts a fresh current-revision Outside CSV count; **Reset Cache** clears it with the other local assignment data. Changing any of those inputs, or upgrading from the older cache/record contract, requires importing the real task CSV again. The sample file is documentation only; no default sample database may write grades.
 
 ## 3. Target isolation and plaintext feedback
 
@@ -140,7 +144,7 @@ Save, publish/release, Gradebook synchronization, and student visibility are sep
 
 ## 5. Traversal, resume, and stop behavior
 
-Auto-Cruise can optionally rewind to the beginning of the iterator and move forward. Rewind and navigation are convenience operations; they do not waive identity or readback checks. A submitted row is not counted as complete merely because it was visited, filled, or present in local progress. Unsubmitted rows are explicitly skipped according to their blank score state.
+Auto-Cruise can optionally rewind to the beginning of the iterator and move forward. Navigation remains bounded, but a partial CSV can be reconciled through a longer Brightspace roster: pages with no matching CSV identity are classified as **Outside CSV**, skipped without filling or saving, and tracked separately. Rewind and navigation are convenience operations; they do not waive identity or readback checks. A submitted row is not counted as complete merely because it was visited, filled, or present in local progress. Unsubmitted rows are explicitly skipped according to their blank score state.
 
 With **Skip matching existing evaluations** enabled, a published evaluation or a previously reload-verified draft can be skipped when the visible score and any supplied feedback match the current CSV. A published mismatch pauses before filling or clicking Update. A match is recorded as **existing matched**, not as a newly saved draft. The script remembers its own fills during the page's lifetime so that an unsaved fill cannot qualify as an existing match even if Brightspace's editor reports a clean state.
 
@@ -153,11 +157,13 @@ After a verified readback, Auto-Cruise resumes using the same task scope. It pau
 - an unexpected, destructive, or unsaved-navigation dialog;
 - a navigation or full-reload timeout.
 
+An Outside CSV page is not a pause condition and is not treated as unsubmitted. Outside CSV pages do not contribute to either the numerator or denominator of CSV completion. All intended CSV rows must still be accounted for; if a wrong or missing roster row leaves an intended row unresolved, Auto-Cruise must not report completion.
+
 Unknown, destructive, and unsaved-navigation dialogs are not auto-accepted. The script may observe a dialog while waiting, but it must not guess which button is safe. Manual review is required.
 
 Emergency Stop invalidates the active run token and all pending continuations. It cannot recall temporary-autosave or Save Draft requests that Brightspace has already sent, or undo server-side changes. Restart only after confirming the current page and task CSV revision.
 
-Because every save includes a reload and readback, completion time is not specified here. Report verified rows and paused rows from observed state; do not promise a fixed per-student rate or 100% completion without a representative live acceptance run.
+Because every save includes a reload and readback, completion time is not specified here. Report verified rows, Outside CSV pages, and paused rows from observed state; do not promise a fixed per-student rate or 100% completion without a representative live acceptance run.
 
 ## 6. Brightspace release boundaries
 
@@ -179,8 +185,8 @@ The project makes no blanket claim of FERPA/GDPR compliance, 100% security, perm
 
 ## 8. Testing and acceptance
 
-The local project includes 34 production-core DOM/lifecycle tests with controlled timers, plus a separate browser fixture that runs the unmodified userscript against synthetic server-stored drafts. Coverage includes identity conflicts, strict/staged CSV import, unique controls, reload/readback, dialogs, cancellation, and the live-page fast-skip/navigation regressions. See [validation results](LOCAL_VALIDATION.md) and [test commands](../CONTRIBUTING.md).
+The local project includes automated regression checks with controlled timers, plus a separate browser fixture that runs the unmodified userscript against synthetic server-stored drafts. Coverage includes identity conflicts, strict/staged CSV import, unique controls, reload/readback, dialogs, cancellation, partial CSV traversal, and Outside CSV accounting. See [validation results](LOCAL_VALIDATION.md) and [test commands](../CONTRIBUTING.md).
 
-Automated tests provide local evidence only. The validation note separately records bounded live-page testing; real draft saving and post-save readback remain unverified. A live run should record the actual tenant controls, the exact course/assignment context, save acknowledgement, post-reload readback, and any remaining paused state.
+Automated tests provide local evidence only. Earlier v1.0.3 live-page testing covered filling, navigation, and fast skip; it is not live v1.0.4 validation. Real draft saving and post-save readback remain unverified. A live run should record the actual tenant controls, the exact course/assignment context, save acknowledgement, post-reload readback, and any remaining paused state.
 
 For implementation details, inspect [`brightspace_auto_feedback_injector.user.js`](../brightspace_auto_feedback_injector.user.js), the local [`README.md`](../README.md), and the fictional [`sample_grades.csv`](../sample_grades.csv).

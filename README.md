@@ -1,7 +1,7 @@
 # 🎓 Brightspace (D2L) CSV Grade & Feedback Auto-Filler
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.0.3-brightgreen.svg)](brightspace_auto_feedback_injector.user.js)
+[![Version](https://img.shields.io/badge/Version-1.0.4-brightgreen.svg)](brightspace_auto_feedback_injector.user.js)
 [![Userscript](https://img.shields.io/badge/Userscript-Violentmonkey%20%7C%20Tampermonkey-green.svg)](brightspace_auto_feedback_injector.user.js)
 [![Privacy: No Tracking](https://img.shields.io/badge/Privacy-No%20Tracking-brightgreen.svg)](#-privacy--local-execution)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-orange.svg)](CONTRIBUTING.md)
@@ -43,7 +43,7 @@ Install one browser extension to run userscripts:
 <!-- GREASY_FORK_URL: Replace the pending-listing line below with the actual script listing after publication. -->
 👉 **Greasy Fork listing: coming soon.**
 
-For now, use the [v1.0.3 source file](brightspace_auto_feedback_injector.user.js) and the [manual installation steps](docs/USER_GUIDE.md#2-install-this-script). Keep only one copy of the helper enabled.
+For now, use the [v1.0.4 source file](brightspace_auto_feedback_injector.user.js) and the [manual installation steps](docs/USER_GUIDE.md#2-install-this-script). Keep only one copy of the helper enabled.
 
 ### Step 3: Grade in Brightspace!
 
@@ -53,7 +53,7 @@ For now, use the [v1.0.3 source file](brightspace_auto_feedback_injector.user.js
 4. Click **📁 Load Gradebook CSV** and select your CSV file.
 5. Check the student and preview. On your first run, try **Fill Current → Save Draft** on one unpublished submission and check the result after the page refreshes.
 6. Click **🚀 Start Full Class Auto-Cruise** (or press <kbd>Alt</kbd> + <kbd>A</kbd>). Use **Emergency Stop** whenever you need to pause.
-7. When the imported rows are accounted for, a 4-note completion chime plays 🎵. Review the draft, existing-match, and unsubmitted counts before publishing.
+7. When every intended CSV row is accounted for, a 4-note completion chime plays 🎵. Review the draft, existing-match, explicitly unsubmitted, and **Outside CSV** counts before publishing. Outside CSV pages are not graded and do not count toward CSV completion.
 
 > 📖 **First time using a userscript?** Follow the [step-by-step installation and user guide](docs/USER_GUIDE.md), including CSV preparation and troubleshooting.
 
@@ -72,6 +72,13 @@ The helper enters grades through the **assignment evaluation page**, not the Gra
 - Once you finish reviewing, publish separately through Brightspace's own controls and check the intended student view.
 - For an already-published evaluation, the helper can **skip matching values**. If the grade or supplied feedback differs, it pauses; it never clicks **Update**.
 
+### 3. CSV rows, roster pages, and identity outcomes
+
+- A CSV row with a student identity and a blank score is an explicit unsubmitted row. Auto-Cruise skips it without filling or saving; **`0` remains a real grade**.
+- A completely empty CSV line identifies no student and is ignored.
+- Auto-Cruise supports a partial CSV while traversing a longer Brightspace roster. If neither the page's supported ID nor its normalized name matches any CSV row, that page is tracked separately as **Outside CSV** and skipped without filling or saving. It is not marked unsubmitted or graded, and it does not contribute to CSV completion.
+- A name match with a conflicting ID, an ambiguous identity, or another genuine identity conflict pauses for review. All intended CSV rows must still be accounted for, so missing or wrong roster rows cannot produce a false completion.
+
 > 📖 **Want to know more about the underlying mechanics?**  
 > Read the **[In-Depth Technical Guide](docs/IN_DEPTH_GUIDE.md)** for student matching, browser storage, and the save-and-refresh workflow.
 
@@ -79,13 +86,13 @@ The helper enters grades through the **assignment evaluation page**, not the Gra
 
 ## 🌟 Features at a Glance
 
-- 🔄 **Class Traversal & Progress**: Optionally rewinds to the first student, then moves forward while tracking your imported rows. A partial CSV or Brightspace filter does not silently become full-course coverage.
+- 🔄 **Class Traversal & Progress**: Optionally rewinds to the first student, then moves through a bounded Brightspace roster while tracking your imported rows. Partial CSVs are supported; roster pages with no matching CSV identity are tracked as **Outside CSV** rather than graded or counted as unsubmitted.
 - 🎯 **Focused Form Filling**: Fills only Overall Grade and Overall Feedback, leaving individual rubric scores and unrelated editors alone.
 - 📝 **Written Feedback with Line Breaks**: Copies ordinary text from your CSV, including multiline comments. No HTML formatting is required.
 - ⚡ **Fast Skip for Existing Matches**: Skips published or previously verified evaluations when the score and any supplied feedback match. Dialogs pause the run for your review.
-- ⚠️ **CSV Validation**: Rejects invalid scores and ambiguous identities. An empty score skips an unsubmitted student; **zero is a real grade**.
+- ⚠️ **CSV Validation**: Rejects invalid scores and ambiguous or conflicting identities. A named row with an empty score skips an explicitly unsubmitted student; a completely empty line is ignored; **zero is a real grade**.
 - 🛑 **Emergency Stop (<kbd>Alt</kbd> + <kbd>S</kbd>)**: Stops further automated actions. It cannot undo an action Brightspace has already received.
-- 🎵 **Completion Chime**: Plays a pleasant 4-note chime when the imported rows are accounted for.
+- 🎵 **Completion Chime**: Plays a pleasant 4-note chime when every intended CSV row is accounted for; **Outside CSV** pages are tracked separately and excluded from completion.
 - 🔒 **Privacy-First Local Execution**: Zero tracking, zero analytics, and no third-party uploads. The script operates Brightspace's fields and buttons rather than making its own network calls.
 
 ---
@@ -136,7 +143,7 @@ OrgDefinedId,Last Name,First Name,Homework 1 Points Grade <Numeric MaxPoints:100
 
 > [!IMPORTANT]
 > Keep **one target grade column**, with its exact heading from the official export. The heading above is an example. Preserve OrgDefinedId values, including leading zeros.
-> An ID mismatch stops the run. If the page does not expose an ID, the student's displayed name must identify exactly one CSV row.
+> A page name that matches a CSV row while its exposed ID conflicts with that row pauses the run. If the page does not expose an ID, its displayed name must identify exactly one CSV row. If neither supported ID nor name matches any CSV row, Auto-Cruise records the page as **Outside CSV** and continues without filling or saving it.
 
 > [!WARNING]
 > **Format B with `Feedback` is a Userscript-Specific Format**:
@@ -163,7 +170,7 @@ OrgDefinedId,Last Name,First Name,Homework 1 Points Grade <Numeric MaxPoints:100
 
 1. Open Excel or Google Sheets.
 2. Put `student`, `score`, and `reason` in the first row.
-3. Fill in student names, scores, and comments (leave unsubmitted scores blank).
+3. Fill in student names, scores, and comments (leave scores blank only for explicitly unsubmitted rows; completely empty lines are ignored).
 4. Save a **CSV UTF-8 (comma-delimited)** copy, not an `.xlsx` workbook.
 
 ### Workflow 3: Automated Python / Jupyter / Autograder Workflow
@@ -233,7 +240,7 @@ It is an assistive script that fills and clicks the existing page, not a separat
 <summary><strong>Q: What happens if a student did not submit their assignment?</strong></summary>
 Keep the student's name or ID in the CSV and leave their **score empty**. Auto-Cruise skips that student and continues automatically: it does not enter a grade or feedback, and it does not save that evaluation. **`0` is a real grade**, not a skip.
 
-A completely empty line is ignored because it identifies no student. If the current student has **no matching row at all** in the CSV, Auto-Cruise pauses so you can check for a missing row or a name/ID mismatch. This is different from a named student whose score is empty.
+A completely empty line is ignored because it identifies no student. If the current roster student has **no matching ID or name at all** in the CSV, Auto-Cruise skips it without filling or saving and tracks it separately as **Outside CSV**. Outside CSV does not count toward CSV completion, and all intended CSV rows must still be accounted for. A name match with a conflicting ID or an ambiguous identity still pauses. These cases are different from a named student whose score is empty.
 </details>
 
 <details>
@@ -245,11 +252,11 @@ The helper never clicks Update. With fast skip enabled, matching grade and feedb
 
 The script runs locally in your browser: **no direct network/API calls, no analytics, and no third-party uploads**. It fills fields and clicks controls; Brightspace handles communication with its own servers, as it does during manual grading.
 
-Your CSV and progress are stored under the school's website in your browser, separated by course and assignment. **Reset Cache** removes that helper data for the current assignment; it does not remove Brightspace grades. Keep real student data out of public issues, screenshots, and sample files.
+Your CSV, progress, and the **Outside CSV** count are stored under the school's website in your browser, separated by course, assignment, and current CSV revision. Reimporting starts a fresh Outside CSV count. **Reset Cache** removes that helper data for the current assignment; it does not remove Brightspace grades. Keep real student data out of public issues, screenshots, and sample files.
 
 ## ✅ Testing & Current Scope
 
-v1.0.3 has 34 automated regression checks, a simulated browser workload, and real Brightspace checks for filling, navigation, fast skip, and pausing on published mismatches. The complete **Save Draft → refresh → verify** path has been exercised in simulation; its real unpublished-evaluation check remains outstanding. See the [test results](docs/LOCAL_VALIDATION.md) for details.
+v1.0.4 has automated regression checks and a simulated browser workload. Earlier v1.0.3 live checks covered filling, navigation, and fast skip; they do not constitute live v1.0.4 validation. The complete **Save Draft → refresh → verify** path has been exercised in simulation, but its real unpublished-evaluation check remains outstanding. See the [test results](docs/LOCAL_VALIDATION.md) for details.
 
 ---
 

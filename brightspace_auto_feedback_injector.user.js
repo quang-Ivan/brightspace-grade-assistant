@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Brightspace (D2L) CSV Grade & Feedback Auto-Filler
 // @namespace    https://github.com/quang-Ivan/brightspace-grade-assistant
-// @version      1.0.3
+// @version      1.0.4
 // @description  A time-saving tool for TAs: fill Brightspace assignment grades and personalized feedback from CSV. Free, open-source, and no third-party uploads.
 // @author       quang-Ivan
 // @license      MIT
@@ -20,6 +20,7 @@
     const SCHEMA_VERSION = 2;
     const PENDING_KEY = 'd2l_pending_draft_readback_v2';
     const READBACK_TTL = 120000;
+    const MIN_ROSTER_CAPACITY = 1000;
     const PAGE_INSTANCE = makeRevision();
     let activeRunToken = 0;
     let activeOperation = null;
@@ -78,15 +79,25 @@
         return value;
     }
 
-    function getProcessedMap() {
+    function getProgressState() {
         const ctx = getAssignmentContextKey();
         const revision = getDatabaseRevision();
         if (!ctx || !revision) return {};
         try {
             const value = JSON.parse(localStorage.getItem('d2l_processed_map_' + ctx));
             return value && value.schemaVersion === SCHEMA_VERSION && value.revision === revision
-                ? value.records || {} : {};
+                ? value : {};
         } catch (_) { return {}; }
+    }
+
+    function getProcessedMap() { return getProgressState().records || {}; }
+
+    function saveProgressState(progress) {
+        const ctx = getAssignmentContextKey(), revision = getDatabaseRevision();
+        if (!ctx || !revision) throw new Error('Import a CSV for this assignment before recording progress.');
+        localStorage.setItem('d2l_processed_map_' + ctx, JSON.stringify({
+            ...progress, schemaVersion: SCHEMA_VERSION, revision
+        }));
     }
 
     function recordFingerprint(data) {
@@ -96,11 +107,19 @@
     function markStudentProcessed(key, details) {
         const db = getStudentDatabase();
         if (!Object.hasOwn(db, key)) throw new Error('Cannot record a student outside this CSV.');
-        const records = getProcessedMap();
+        const progress = getProgressState();
+        const records = progress.records || {};
         records[key] = {...details, fingerprint: recordFingerprint(db[key]), timestamp: Date.now()};
-        localStorage.setItem('d2l_processed_map_' + getAssignmentContextKey(), JSON.stringify({
-            schemaVersion: SCHEMA_VERSION, revision: getDatabaseRevision(), records
-        }));
+        saveProgressState({...progress, records});
+    }
+
+    function markOutsideCsv(target) {
+        const progress = getProgressState();
+        const outsideCsv = progress.outsideCsv || {};
+        const key = target.orgId ? 'id:' + target.orgId : 'name:' + target.name;
+        if (outsideCsv[key]) return;
+        outsideCsv[key] = true;
+        saveProgressState({...progress, outsideCsv});
     }
 
     function clearProcessedMap() {
@@ -145,7 +164,9 @@
         if (studentOrgId) {
             const id = normalizeOrgId(studentOrgId);
             const byId = entries.filter(([, data]) => data.orgId && normalizeOrgId(data.orgId) === id);
-            if (byId.length !== 1) return {ambiguous: true, error: byId.length ? 'Duplicate OrgDefinedId.' : 'Page OrgDefinedId is not in this CSV.'};
+            if (byId.length > 1) return {ambiguous: true, error: 'Duplicate OrgDefinedId.'};
+            if (!byId.length) return byName.length
+                ? {ambiguous: true, error: 'Page name matches a CSV row, but its OrgDefinedId conflicts.'} : null;
             if (byName.length && !byName.some(([key]) => key === byId[0][0])) {
                 return {ambiguous: true, error: 'Page name and OrgDefinedId identify different CSV records.'};
             }
@@ -579,7 +600,8 @@
         const button = navigationButton(direction);
         if (isDisabled(button)) return 'end';
         if (!guardTarget(op, target)) return false;
-        if (++op.hops > Math.max(20, Object.keys(getStudentDatabase()).length * 7 + 10)) {
+        // A partial CSV can cover a few students in a much longer roster.
+        if (++op.hops > Math.max(MIN_ROSTER_CAPACITY, Object.keys(getStudentDatabase()).length) * 7 + 10) {
             throw new Error('Navigation limit reached. Review roster/filter before restarting.');
         }
         button.click();
@@ -600,7 +622,7 @@
     }
 
     async function rewindToFirstStudent(op) {
-        const cap = Math.max(10, Object.keys(getStudentDatabase()).length + 5);
+        const cap = Math.max(MIN_ROSTER_CAPACITY, Object.keys(getStudentDatabase()).length) + 5;
         for (let step = 0; step < cap; step++) {
             if (!guardOperation(op)) return false;
             if (isAtFirstStudent()) return true;
@@ -626,7 +648,8 @@
         const matched = entries.filter(([key, data]) => data.submitted !== false && completedRecord(key, data) && records[key].state === 'matched').length;
         const skipped = entries.filter(([key, data]) => data.submitted === false && completedRecord(key, data)).length;
         const submitted = entries.filter(([, data]) => data.submitted !== false).length;
-        return {total: entries.length, submitted, verified, matched, skipped,
+        const outsideCsv = Object.keys(getProgressState().outsideCsv || {}).length;
+        return {total: entries.length, submitted, verified, matched, skipped, outsideCsv,
             remaining: entries.filter(([key, data]) => !completedRecord(key, data)).map(([, data]) => data.name)};
     }
 
@@ -637,7 +660,7 @@
         const text = document.getElementById('bs-progress-text');
         const bar = document.getElementById('bs-progress-bar');
         const badge = document.getElementById('bs-missing-badge');
-        if (text) text.textContent = 'Drafts verified: ' + progress.verified + '; existing matched: ' + progress.matched + '; unsubmitted: ' + progress.skipped;
+        if (text) text.textContent = 'Drafts verified: ' + progress.verified + '; existing matched: ' + progress.matched + '; unsubmitted: ' + progress.skipped + '; outside CSV: ' + progress.outsideCsv;
         if (bar) bar.style.width = percent + '%';
         if (badge) {
             badge.textContent = progress.total ? progress.remaining.length + ' CSV row(s) remaining' : 'Import a CSV for this assignment.';
@@ -660,8 +683,16 @@
 
     async function cruiseStep(op) {
         if (!guardOperation(op)) return false;
-        const target = captureTarget(op);
+        const target = captureTarget(op, false);
         const data = target.data;
+        if (!data) {
+            if (!guardTarget(op, target)) return false;
+            markOutsideCsv(target);
+            updateProgress();
+            setStatus('Not in CSV: skipping this student without filling or saving.', '#006fbf');
+            if (!await delay(200, op) || !guardTarget(op, target)) return false;
+            return 'advance';
+        }
         if (data.submitted === false) {
             if (!guardTarget(op, target)) return false;
             markStudentProcessed(data.key, {state: 'unsubmitted'});
@@ -702,7 +733,7 @@
                     const progress = progressSummary();
                     if (!progress.remaining.length && progress.total) {
                         playSuccessChime();
-                        finishOperation(op, 'CSV complete: ' + progress.verified + ' reload-verified drafts; ' + progress.matched + ' existing evaluations matched; ' + progress.skipped + ' explicitly unsubmitted.');
+                        finishOperation(op, 'CSV complete: ' + progress.verified + ' reload-verified drafts; ' + progress.matched + ' existing evaluations matched; ' + progress.skipped + ' explicitly unsubmitted; ' + progress.outsideCsv + ' outside CSV skipped.');
                         return;
                     }
                     if (!getAutoRewindPref() || op.wraps >= 2) throw new Error('CSV rows remain unverified: ' + progress.remaining.slice(0, 5).join(', '));
@@ -803,7 +834,7 @@
                                 const progress = progressSummary();
                                 if (!progress.remaining.length) {
                                     playSuccessChime();
-                                    finishOperation(op, 'CSV complete: ' + progress.verified + ' reload-verified drafts; ' + progress.skipped + ' explicitly unsubmitted.');
+                                    finishOperation(op, 'CSV complete: ' + progress.verified + ' reload-verified drafts; ' + progress.matched + ' existing evaluations matched; ' + progress.skipped + ' explicitly unsubmitted; ' + progress.outsideCsv + ' outside CSV skipped.');
                                     return;
                                 }
                                 if (!getAutoRewindPref() || op.wraps >= 2) throw new Error('CSV still has unverified students; review the roster/filter.');
@@ -955,7 +986,7 @@
 
             panel.innerHTML = `
                 <div id="bs-panel-hdr" style="background:#006fbf; color:#fff; padding:10px 14px; font-weight:bold; cursor:move; display:flex; justify-content:space-between; align-items:center; border-radius:6px 6px 0 0;">
-                    <span>🎓 Brightspace CSV Grade & Feedback Auto-Filler v1.0.3</span>
+                    <span>🎓 Brightspace CSV Grade & Feedback Auto-Filler v1.0.4</span>
                     <button id="bs-panel-min" style="background:none; border:none; color:#fff; font-size:16px; cursor:pointer; font-weight:bold;">–</button>
                 </div>
                 <div id="bs-panel-bdy" style="padding:14px;">
@@ -1044,7 +1075,7 @@
                     </div>
 
                     <div style="font-size:11px; background:#eef5fc; padding:8px; border-radius:5px; margin-bottom:10px; color:#333; line-height:1.4;">
-                        💡 <b>Draft verification</b>: Each save requires a fresh native acknowledgment and page reload readback. Completion covers only the imported CSV; unknown students or mismatches pause the run.
+                        💡 <b>Draft verification</b>: Each save requires a fresh native acknowledgment and page reload readback. Students outside the CSV are skipped separately; identity conflicts pause the run. Completion covers only the imported CSV.
                     </div>
 
                     <hr style="border:0; border-top:1px solid #eee; margin:10px 0;">

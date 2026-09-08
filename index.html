@@ -35,7 +35,7 @@
     },
     "description": "A free userscript for teaching assistants to fill reviewed assignment grades and personalized feedback from CSV into Brightspace.",
     "url": "https://quang-Ivan.github.io/brightspace-grade-assistant/",
-    "softwareVersion": "1.0.3",
+    "softwareVersion": "1.0.4",
     "license": "https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/LICENSE",
     "author": {
       "@type": "Person",
@@ -283,7 +283,7 @@
   <header>
     <div class="container">
       <div class="badge-bar" style="margin-bottom:16px;">
-        <span class="badge">🚀 v1.0.3</span>
+        <span class="badge">🚀 v1.0.4</span>
         <span class="badge">🔒 No Tracking or Third-Party Uploads</span>
         <span class="badge">⚖️ MIT Open Source</span>
       </div>
@@ -339,7 +339,7 @@
           <div class="card-icon">🔄</div>
           <h3>Class Navigation & Progress</h3>
           <p>
-            Start from the current student or rewind to the beginning. Track newly verified drafts, matching existing evaluations, unsubmitted rows, and rows still remaining in your CSV.
+            Start here or rewind to the beginning. Partial CSVs are supported: students outside your file are skipped and counted separately as <strong>Outside CSV</strong>. Completion tracks only imported rows.
           </p>
         </div>
 
@@ -363,7 +363,7 @@
           <div class="card-icon">⚠️</div>
           <h3>Smart Unsubmitted Handling</h3>
           <p>
-            Keep the student's name or ID and leave the score empty to skip automatically, without filling or saving. Zero is a real grade. A student with no matching CSV row pauses the run.
+            Keep the student's name or ID and leave the score empty to skip without filling or saving. Zero is a real grade; completely empty lines are ignored. Outside-CSV students are skipped separately, not marked unsubmitted. Conflicting or ambiguous identities pause the run.
           </p>
         </div>
 
@@ -379,7 +379,7 @@
           <div class="card-icon">🎵</div>
           <h3>Audio Completion Chime</h3>
           <p>
-            A pleasant 4-note chime signals that the imported rows are accounted for. Review the progress counts and drafts before publishing results in Brightspace.
+            A pleasant 4-note chime signals that every intended CSV row is accounted for. Review the progress counts, including <strong>Outside CSV</strong>, and drafts before publishing results in Brightspace.
           </p>
         </div>
       </div>
@@ -442,7 +442,7 @@
           <div class="card-icon">📑</div>
           <h3>Workflow 2: Excel / Google Sheets</h3>
           <p>
-            Create a three-column sheet: <code>student</code>, <code>score</code>, <code>reason</code>. Leave only unsubmitted scores blank, then save a CSV UTF-8 copy.
+            Create a three-column sheet: <code>student</code>, <code>score</code>, <code>reason</code>. Leave scores blank only for explicitly unsubmitted rows; completely empty lines are ignored. Then save a CSV UTF-8 copy.
           </p>
         </div>
         <div class="card">
@@ -567,7 +567,7 @@
         <div class="faq-answer">With fast skip enabled, matching grades and feedback are skipped. A mismatch pauses the helper; it does not click Update. An unsaved fill is not treated as an existing match.</div>
       </div>
       <p style="margin-top:24px; color:var(--text-muted); font-size:14px;">
-        <strong>Testing:</strong> v1.0.3 includes automated regression checks, a simulated browser workload, and real Brightspace checks for filling, navigation, and fast skip. The Save Draft and refresh workflow still needs its real unpublished-evaluation check.
+        <strong>Testing:</strong> v1.0.4 includes automated regression checks and simulated-browser coverage. Earlier v1.0.3 live checks covered filling, navigation, and fast skip; they are not live v1.0.4 validation. The Save Draft and refresh workflow still needs its real unpublished-evaluation check.
         <a href="https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/LOCAL_VALIDATION.md">See the testing details</a>.
       </p>
     </div>

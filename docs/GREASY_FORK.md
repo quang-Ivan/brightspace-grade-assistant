@@ -25,9 +25,9 @@ Keep only one copy of this helper enabled.
 - Enter Overall Grade and Overall Feedback together, including multiline written comments.
 - Skip existing evaluations when the grade and supplied feedback already match.
 - Rewind to the beginning of the current student list or continue from where you are.
-- Track verified drafts, existing matches, unsubmitted rows, and rows still remaining.
+- Track verified drafts, existing matches, explicitly unsubmitted rows, **Outside CSV** pages, and rows still remaining.
 - Pause with **Emergency Stop** or **Alt+S**.
-- Hear a completion chime when the imported rows are accounted for.
+- Hear a completion chime when every intended CSV row is accounted for; **Outside CSV** pages are excluded from completion.
 
 ## 📋 Simple CSV format
 
@@ -42,7 +42,7 @@ These fictional scores are out of 100. Use the actual points for your assignment
 
 - Keep the student's name or ID and leave their **score empty** to skip automatically, without filling or saving that evaluation. **0** is a real grade.
 - Feedback is ordinary text, not HTML. Leave it empty to preserve existing feedback.
-- A student missing from the file pauses the automatic run.
+- Completely empty CSV lines are ignored. Auto-Cruise supports partial CSVs through longer rosters: a roster student with neither a matching ID nor name is skipped without filling or saving and tracked separately as **Outside CSV**. Outside CSV is not unsubmitted or graded and does not count toward CSV completion; name/ID conflicts and ambiguous identities still pause.
 - You can also use an official Brightspace export with **OrgDefinedId**, names, one target grade column, and optional **Feedback**. Keep the exact exported grade heading.
 
 Load this CSV in the helper, not Brightspace's Grades Import tool.
@@ -55,7 +55,7 @@ The helper uses **Save Draft**, waits for Brightspace's confirmation, refreshes,
 
 **No tracking, direct network/API calls, or third-party uploads.** The script reads your CSV locally and operates Brightspace's existing fields and buttons. Brightspace itself handles sending and saving grades.
 
-Imported rows and progress stay in browser storage under your school's website. **Reset Cache** removes the helper's current-assignment data, not Brightspace grades.
+Imported rows, progress, and the current CSV revision's **Outside CSV** count stay in browser storage under your school's website. Reimporting starts a fresh Outside CSV count; **Reset Cache** removes the helper's current-assignment data, not Brightspace grades.
 
 ## 📖 Help and scope
 
@@ -64,7 +64,7 @@ Imported rows and progress stay in browser storage under your school's website. 
 - [Source code and documentation](https://github.com/quang-Ivan/brightspace-grade-assistant)
 - [Testing details](https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/LOCAL_VALIDATION.md)
 
-Designed for the English-language Consistent Evaluation interface. v1.0.3 has automated and simulated-browser checks plus real-page filling, navigation, and fast-skip checks. The complete Save Draft and refresh path still needs its real unpublished-evaluation check; that workflow has been exercised in simulation.
+Designed for the English-language Consistent Evaluation interface. v1.0.4 has automated regression checks and simulated-browser coverage. Earlier v1.0.3 live checks covered filling, navigation, and fast skip; they are not live v1.0.4 validation. The complete Save Draft and refresh path still needs its real unpublished-evaluation check; that workflow has been exercised in simulation. See [the local validation notes](https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/LOCAL_VALIDATION.md) for details.
 
 ## ❓ Can I bulk enter assignment feedback as a TA?
 

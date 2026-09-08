@@ -6,7 +6,7 @@ This is the launch setup for **Brightspace (D2L) CSV Grade & Feedback Auto-Fille
 
 | Channel | Verified status | Remaining work |
 | --- | --- | --- |
-| [GitHub](https://github.com/quang-Ivan/brightspace-grade-assistant) | Public repository on `main`; About description, homepage, and ten relevant topics configured. CI passed all 34 tests. | Normal maintenance. |
+| [GitHub](https://github.com/quang-Ivan/brightspace-grade-assistant) | Public repository on `main`; About description, homepage, and ten relevant topics configured. CI runs the automated regression suite on each push. | Normal maintenance. |
 | [GitHub Pages](https://quang-ivan.github.io/brightspace-grade-assistant/) | Published from `main` / repository root. The public page and script were fetched successfully; the script matched the local source. The 28-second demo played in Chrome with English captions. | Add the assigned Greasy Fork installation URL. |
 | Greasy Fork | Script, listing copy, and public demo links are ready. | The owner uploads the listing; then replace the three pending URL sections below. |
 | Google Search Console | Project-scoped ownership verified with Google's HTML tag. The homepage indexing request was accepted into the priority crawl queue. | Google has not yet indexed the homepage. The submitted sitemap still reports `Couldn't fetch`, although Google's live inspection of that exact sitemap reports crawl allowed and page fetch successful; one resubmission followed that check. Sitemap processing remains unconfirmed. |
