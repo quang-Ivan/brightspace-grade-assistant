@@ -89,7 +89,8 @@ These are fictional examples for an assignment marked out of 8. Replace the exam
 
 - **student:** use the name displayed on the student's Brightspace evaluation page. Keep one row per student. If two students share a name, do not guess which row will match; see the [student-ID instructions](IN_DEPTH_GUIDE.md#using-student-ids).
 - **score:** enter points, not a percentage. For 7 points out of 8, enter `7`, not `87.5` or `7/8`. Use a decimal point, such as `7.5`.
-- **An empty score means skip this student as unsubmitted.** It is not the same as `0`: zero is a real grade and will be entered. Do not use an empty cell for a submitted student whose grade you simply have not decided yet; leave that row out and use manual controls for the rows you are ready to process.
+- **An empty score means skip this student automatically.** Keep the student's name or ID in the row and leave the score cell empty for a non-submission. Auto-Cruise continues without entering a grade or feedback and without saving that evaluation. It is not the same as `0`: zero is a real grade and will be entered.
+- A completely empty line is ignored. A student with no matching CSV row causes Auto-Cruise to pause; check for a missing row or a name/ID mismatch. Neither case is the same as a named student with an empty score.
 - **reason:** the written feedback you want the student to receive. An empty feedback cell leaves existing feedback unchanged; it does not erase it. Use the feedback language required by your course; the helper copies your text rather than translating it.
 - When using a spreadsheet app, keep the feedback in one cell even if it contains commas or line breaks; CSV export handles those characters. If you edit CSV by hand, put such feedback in double quotes and double any quotation marks inside it.
 

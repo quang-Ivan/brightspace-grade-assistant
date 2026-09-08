@@ -40,7 +40,7 @@ Casey Example,,"No submission"
 
 These fictional scores are out of 100. Use the actual points for your assignment.
 
-- An **empty score** means skip as unsubmitted; **0** is a real grade.
+- Keep the student's name or ID and leave their **score empty** to skip automatically, without filling or saving that evaluation. **0** is a real grade.
 - Feedback is ordinary text, not HTML. Leave it empty to preserve existing feedback.
 - A student missing from the file pauses the automatic run.
 - You can also use an official Brightspace export with **OrgDefinedId**, names, one target grade column, and optional **Feedback**. Keep the exact exported grade heading.

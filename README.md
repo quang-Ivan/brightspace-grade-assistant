@@ -231,7 +231,9 @@ It is an assistive script that fills and clicks the existing page, not a separat
 
 <details>
 <summary><strong>Q: What happens if a student did not submit their assignment?</strong></summary>
-A blank score in your CSV marks an unsubmitted student to skip. A student missing from the CSV is different: Auto-Cruise pauses. For a submitted student you have not graded yet, leave the row out and use manual controls for the rows you are ready to process.
+Keep the student's name or ID in the CSV and leave their **score empty**. Auto-Cruise skips that student and continues automatically: it does not enter a grade or feedback, and it does not save that evaluation. **`0` is a real grade**, not a skip.
+
+A completely empty line is ignored because it identifies no student. If the current student has **no matching row at all** in the CSV, Auto-Cruise pauses so you can check for a missing row or a name/ID mismatch. This is different from a named student whose score is empty.
 </details>
 
 <details>
