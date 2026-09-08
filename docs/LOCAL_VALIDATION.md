@@ -1,6 +1,6 @@
 # Testing & Current Scope
 
-The initial v1.0.1 simulation and subsequent bounded live-page checks were performed on 2026-09-08. No grades were published, and no GitHub push or hosted deployment was performed. Student identities and feedback are intentionally omitted here.
+The initial v1.0.1 simulation and subsequent bounded live-page checks were performed on 2026-09-08. No grades were published. Those checks did not include a GitHub push or hosted deployment; the project's subsequent public launch is recorded separately in [Publication & Search Setup](PUBLISHING.md#launch-status--2026-09-08). Student identities and feedback are intentionally omitted here.
 
 ## Automated regression checks
 

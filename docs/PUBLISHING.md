@@ -1,22 +1,33 @@
 # Publication & Search Setup
 
-This is the launch setup for **Brightspace (D2L) CSV Grade & Feedback Auto-Filler**. It is built primarily for teaching assistants; instructors are welcome too. Local files and planned URLs do not establish that a repository, site, listing, or search result is already public.
+This is the launch setup for **Brightspace (D2L) CSV Grade & Feedback Auto-Filler**. It is built primarily for teaching assistants; instructors are welcome too. The current public status is recorded below; the remaining sections explain how to maintain each channel.
+
+## Launch status — 2026-09-08
+
+| Channel | Verified status | Remaining work |
+| --- | --- | --- |
+| [GitHub](https://github.com/quang-Ivan/brightspace-grade-assistant) | Public repository on `main`; About description, homepage, and ten relevant topics configured. CI passed all 34 tests. | Normal maintenance. |
+| [GitHub Pages](https://quang-ivan.github.io/brightspace-grade-assistant/) | Published from `main` / repository root. The public page and script were fetched successfully; the script matched the local source. The 28-second demo played in Chrome with English captions. | Add the assigned Greasy Fork installation URL. |
+| Greasy Fork | Script, listing copy, and public demo links are ready. | The owner uploads the listing; then replace the three pending URL sections below. |
+| Google Search Console | Project-scoped ownership verified with Google's HTML tag. The homepage indexing request was accepted into the priority crawl queue. | Google has not yet indexed the homepage. The submitted sitemap still reports `Couldn't fetch`, although Google's live inspection of that exact sitemap reports crawl allowed and page fetch successful; one resubmission followed that check. Sitemap processing remains unconfirmed. |
+
+An accepted indexing request is not an indexed search result. Do not repeatedly submit the homepage to move it up the queue. The public demo demonstrates field entry with fictional data; publication of this project does not close the separate [live draft-save acceptance boundary](LOCAL_VALIDATION.md#remaining-acceptance-boundary).
 
 ## 1. GitHub: source, documentation, and feedback
 
 Publish only this repository directory, not its parent coursework directory. Include the fictional demo assets, `.nojekyll`, and `sitemap.xml`. Do not upload dependencies, local browser output, student records, or private CSV files.
 
-The links in this project are prepared for `quang-Ivan/brightspace-grade-assistant` on the `main` branch. If the owner, repository, or branch changes, update project links before publishing.
+The links in this project use `quang-Ivan/brightspace-grade-assistant` on the `main` branch. If the owner, repository, or branch changes, update project links before publishing.
 
-**Repository About description** — ready to paste:
+**Repository About description** — configured:
 
 > A free, open-source CSV grade and personalized-feedback auto-filler for Brightspace (D2L). Built for TAs; instructors welcome. No third-party uploads.
 
-**Website** — use after Pages is live:
+**Website** — live:
 
 <https://quang-Ivan.github.io/brightspace-grade-assistant/>
 
-**Topics** — add in the repository's About settings:
+**Topics** — configured in the repository's About settings:
 
 ```text
 brightspace d2l userscript tampermonkey violentmonkey teaching-assistants grading feedback csv lms
@@ -26,7 +37,7 @@ These describe the tool's actual use; they are not claims about measured keyword
 
 ## 2. GitHub Pages: demo and installation front door
 
-After the repository is uploaded, choose **Settings → Pages → Deploy from a branch → main → /(root)**. This is a static HTML/CSS site; `.nojekyll` keeps the files served directly, and no framework build is needed. See [GitHub's publishing-source instructions](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site).
+The active setting is **Settings → Pages → Deploy from a branch → main → /(root)**. This is a static HTML/CSS site; `.nojekyll` keeps the files served directly, and no framework build is needed. See [GitHub's publishing-source instructions](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site).
 
 Check the actual published page, not just the deployment status:
 
@@ -64,14 +75,5 @@ Do not guess the numeric script ID from the GitHub repository name. An existing 
 The property is scoped to the project path. A `robots.txt` inside that path would not control Google's crawling of the hostname, so none is added as a pretend indexing fix. Keep the page public and avoid a `noindex` directive when you want it indexed.
 
 References: [Search Console common tasks](https://support.google.com/webmasters/answer/10351509?hl=en), [ownership verification](https://support.google.com/webmasters/answer/9008080?hl=en), and [Google's SEO starter guide](https://developers.google.com/search/docs/fundamentals/seo-starter-guide). Google does not use the `meta keywords` tag; the page instead answers real CSV/feedback questions in readable text.
-
-## Local preparation versus public completion
-
-| Surface | Prepared in this repository | Requires the live account or published URL |
-| --- | --- | --- |
-| GitHub | README, source, guide, demo, About copy, Topics list | Repository upload and About/Topics settings |
-| Pages | Homepage, demo player, metadata, FAQs, sitemap | Enable Pages and check the public page |
-| Greasy Fork | Script metadata, listing copy, screenshot/video links | Owner uploads the script; add its assigned URL |
-| Google Search | Search-oriented content and sitemap | Verify Search Console property and request indexing |
 
 Installing or updating the tool is not authorization to publish grades. Keep student-data handling and Brightspace publication separate from publishing this open-source project.
