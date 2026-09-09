@@ -10,7 +10,7 @@
 
 Free and open-source, with no tracking or third-party uploads. One script, no programming required. Install it with Violentmonkey or Tampermonkey—no Node, npm, or test files needed.
 
-[**Get the script**](#step-2-install-this-userscript) · [**Project homepage & video**](https://quang-Ivan.github.io/brightspace-grade-assistant/#demo) · [**User guide**](docs/USER_GUIDE.md)
+[**Install from Greasy Fork**](https://greasyfork.org/en/scripts/595051-brightspace-d2l-csv-grade-feedback-auto-filler) · [**Project homepage & video**](https://quang-Ivan.github.io/brightspace-grade-assistant/#demo) · [**User guide**](docs/USER_GUIDE.md)
 
 ## 🎬 See it in action
 
@@ -38,12 +38,9 @@ Install one browser extension to run userscripts:
 
 ### Step 2: Install This Userscript
 
-**Greasy Fork will be the main installation source.** Once the listing is available, open it, click **Install this script**, then confirm **Install** in your extension.
+Open the [**Greasy Fork listing**](https://greasyfork.org/en/scripts/595051-brightspace-d2l-csv-grade-feedback-auto-filler), click **Install this script**, then confirm **Install** in your extension. Your userscript manager can check Greasy Fork for future updates.
 
-<!-- GREASY_FORK_URL: Replace the pending-listing line below with the actual script listing after publication. -->
-👉 **Greasy Fork listing: coming soon.**
-
-For now, use the [v1.0.4 source file](brightspace_auto_feedback_injector.user.js) and the [manual installation steps](docs/USER_GUIDE.md#2-install-this-script). Keep only one copy of the helper enabled.
+Alternatively, use the [v1.0.4 source file](brightspace_auto_feedback_injector.user.js) and the [manual installation steps](docs/USER_GUIDE.md#2-install-this-script). Keep only one copy of the helper enabled.
 
 ### Step 3: Grade in Brightspace!
 

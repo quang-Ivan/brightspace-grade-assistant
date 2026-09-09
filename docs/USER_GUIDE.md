@@ -40,12 +40,7 @@ You should now see your chosen extension in Chrome's extensions list. You can us
 
 ### Recommended: Greasy Fork
 
-<!-- GREASY_FORK_URL: Add the actual script listing here after publication. -->
-**The listing link will be added after the first upload.**
-
-Once it is available:
-
-1. Open this project's Greasy Fork listing.
+1. Open this project's [Greasy Fork listing](https://greasyfork.org/en/scripts/595051-brightspace-d2l-csv-grade-feedback-auto-filler).
 2. Click the green **Install this script** button.
 3. Your userscript manager opens a confirmation page. Check the script name and version, then click **Install**.
 4. Keep only one copy of this helper enabled. If you previously copied the source into the manager manually, disable the old copy.
