@@ -8,7 +8,7 @@ This is the launch setup for **Brightspace (D2L) CSV Grade & Feedback Auto-Fille
 | --- | --- | --- |
 | [GitHub](https://github.com/quang-Ivan/brightspace-grade-assistant) | Public repository on `main`; About description, homepage, and ten relevant topics configured. CI runs the automated regression suite on each push. | Normal maintenance. |
 | [GitHub Pages](https://quang-ivan.github.io/brightspace-grade-assistant/) | Published from `main` / repository root. The public page and script were fetched successfully; the script matched the local source. The 28-second demo played in Chrome with English captions. Installation links now point to the published Greasy Fork listing. | Normal maintenance. |
-| [Greasy Fork](https://greasyfork.org/en/scripts/595051-brightspace-d2l-csv-grade-feedback-auto-filler) | Public v1.0.4 listing; downloaded code matches the repository apart from Greasy Fork's generated update metadata. Automatic source and Markdown-description syncing configured; **Update and sync now** returned **Script successfully synced**, and both source URLs and Automatic mode persisted on reopening Admin. | Future scheduled checks are handled by Greasy Fork; push-triggered Webhook mode is not configured. |
+| [Greasy Fork](https://greasyfork.org/en/scripts/595051-brightspace-d2l-csv-grade-feedback-auto-filler) | Public v1.0.4 listing. A signed GitHub push updated both code and Markdown description with no reported failures; the public code matched the repository apart from generated update metadata. Admin confirmed **Webhook** mode and both source URLs. | Normal maintenance; check delivery results after releases. |
 | Google Search Console | As last checked on 2026-09-08: project-scoped ownership verified with Google's HTML tag. The homepage indexing request was accepted into the priority crawl queue. | At that check, Google had not indexed the homepage. The submitted sitemap reported `Couldn't fetch`, although Google's live inspection of that exact sitemap reported crawl allowed and page fetch successful; one resubmission followed that check. Sitemap processing remains unconfirmed and was not rechecked for this link update. |
 
 An accepted indexing request is not an indexed search result. Do not repeatedly submit the homepage to move it up the queue. The public demo demonstrates field entry with fictional data; publication of this project does not close the separate [live draft-save acceptance boundary](LOCAL_VALIDATION.md#remaining-acceptance-boundary).
@@ -61,13 +61,17 @@ The README, user guide, and homepage link directly to that listing. The homepage
 
 In the listing's **Admin → Source Syncing**:
 
-- **Mode:** Automatic — Greasy Fork periodically checks for changes. This is not an immediate GitHub push webhook.
+- **Mode:** Webhook — updates are triggered by GitHub pushes, not periodic polling. The repository webhook is active, subscribes only to **push**, sends **application/json**, uses a signing secret, and keeps SSL verification enabled.
 - **Script source:** [main/brightspace_auto_feedback_injector.user.js](https://raw.githubusercontent.com/quang-Ivan/brightspace-grade-assistant/main/brightspace_auto_feedback_injector.user.js).
 - **Default additional info:** [main/docs/GREASY_FORK.md](https://raw.githubusercontent.com/quang-Ivan/brightspace-grade-assistant/main/docs/GREASY_FORK.md), formatted as **Markdown**. Other repository documents are not copied into the listing.
 
 Test script changes locally before pushing to `main`, and increase `@version` for a new script release. Changes to these two source files can subsequently reach the public listing without another manual upload. After a release, compare the public installation file with the intended source; configuration alone is not proof that a new release has synchronized.
 
-To check or recover a delayed update, inspect **Last successful sync** and any error in Admin, then use **Update and sync now**. Use **Turn off syncing for this script** to disable it. No local scheduler, additional credential, or GitHub webhook was created. If immediate push-triggered updates become necessary, Greasy Fork supports [webhooks](https://greasyfork.org/en/help/api), which require separate configuration.
+The first real push, [ebb2afe](https://github.com/quang-Ivan/brightspace-grade-assistant/commit/ebb2afe8532109938399358a1824ef0df09bf43c), changed one non-executable script comment and one user-guide sentence in the listing copy. GitHub delivery returned HTTP 200, Greasy Fork reported both updates with an empty `updated_failed` list, and the public installation file contained the new comment. The grading logic and version remained unchanged at 1.0.4. Reopening Admin confirmed **Webhook** selected and both original source URLs retained.
+
+To check or recover a delayed update, inspect the [GitHub webhook's Recent Deliveries](https://github.com/quang-Ivan/brightspace-grade-assistant/settings/hooks/676669253) and the response body, not only its HTTP status. After resolving an error, redeliver the affected push or use **Update and sync now** in Greasy Fork Admin. Deactivate the GitHub webhook to pause notifications; use **Turn off syncing for this script** in Greasy Fork to remove the script's syncing configuration.
+
+Keep the signing secret in Greasy Fork and the GitHub webhook settings, never in the repository. If it is regenerated, update the GitHub webhook's Secret before testing delivery again. No local scheduler is needed. See [Greasy Fork's webhook documentation](https://greasyfork.org/en/help/api).
 
 ## 4. Google: verify and request indexing after launch
 
