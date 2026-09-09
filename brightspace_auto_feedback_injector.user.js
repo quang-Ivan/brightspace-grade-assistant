@@ -13,6 +13,7 @@
 // @grant        none
 // ==/UserScript==
 
+// Maintained on GitHub; the Greasy Fork copy follows signed push updates.
 (function() {
     'use strict';
 

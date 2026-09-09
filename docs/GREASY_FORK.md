@@ -18,7 +18,7 @@ Built for **Teaching Assistants (TAs)**; instructors are welcome too. Free and o
 4. Click **Load Gradebook CSV** in the helper panel and select your reviewed CSV.
 5. Check the student, points, and feedback preview. Try **Fill Current → Save Draft** on one unpublished submission before starting **Auto-Cruise**.
 
-Keep only one copy of this helper enabled.
+Keep only one copy of this helper enabled. For scripts installed from this page, use your userscript manager's update check to get new versions.
 
 ## 🌟 Features
 
