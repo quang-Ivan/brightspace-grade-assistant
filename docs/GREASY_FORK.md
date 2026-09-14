@@ -6,16 +6,16 @@ Built for **Teaching Assistants (TAs)**; instructors are welcome too. Free and o
 
 ## 🎬 See it in action
 
-[![The real helper filling fictional grades and feedback in an anonymized copy of Brightspace's evaluation page](https://raw.githubusercontent.com/quang-Ivan/brightspace-grade-assistant/main/assets/demo/quick-demo.png)](https://quang-Ivan.github.io/brightspace-grade-assistant/#demo)
+[![A reviewed CSV matched to the current fictional student in the native Brightspace layout](https://raw.githubusercontent.com/quang-Ivan/brightspace-grade-assistant/main/assets/demo/quick-demo.png)](https://quang-Ivan.github.io/brightspace-grade-assistant/#demo)
 
-[Watch the short captioned demo](https://quang-Ivan.github.io/brightspace-grade-assistant/#demo): load a CSV, fill a student's grade and feedback, then move to the next student. It uses the real script on an anonymized local copy of Brightspace's evaluation-page HTML with fictional grading data, not a live save or a speed benchmark. Install the script using Greasy Fork's button above.
+[Watch the 37-second silent demo](https://quang-Ivan.github.io/brightspace-grade-assistant/#demo): import one reviewed CSV, match each student, and fill their score and individual feedback together. The v1.0.5 helper runs on a source-anonymized copy of the actual Brightspace evaluation page. Numbered steps, a stable page view and visible input cues show the first three students and selected results from a 20-person fictional roster. English captions are burned in. No grades are saved or published in the demonstration.
 
 ## ⚡ Getting started
 
 1. Install a userscript manager if you do not already have one.
 2. Click **Install this script** above, then confirm **Install** in the manager.
 3. Sign in to Brightspace and open one student's assignment evaluation.
-4. Click **Load Gradebook CSV** in the helper panel and select your reviewed CSV.
+4. Click **Load Scores & Feedback CSV** in the helper panel and select your reviewed CSV.
 5. Check the student, points, and feedback preview. Try **Fill Current → Save Draft** on one unpublished submission before starting **Auto-Cruise**.
 
 Keep only one copy of this helper enabled. For scripts installed from this page, use your userscript manager's update check to get new versions.
@@ -64,7 +64,7 @@ Imported rows, progress, and the current CSV revision's **Outside CSV** count st
 - [Source code and documentation](https://github.com/quang-Ivan/brightspace-grade-assistant)
 - [Testing details](https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/LOCAL_VALIDATION.md)
 
-Designed for the English-language Consistent Evaluation interface. v1.0.4 has automated regression checks and simulated-browser coverage. Earlier v1.0.3 live checks covered filling, navigation, and fast skip; they are not live v1.0.4 validation. The complete Save Draft and refresh path still needs its real unpublished-evaluation check; that workflow has been exercised in simulation. See [the local validation notes](https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/LOCAL_VALIDATION.md) for details.
+Designed for the English-language Consistent Evaluation interface. v1.0.5 has automated regression checks and simulated-browser coverage. Earlier v1.0.3 live checks covered filling, navigation, and fast skip; they are not live v1.0.5 validation. The complete Save Draft and refresh path still needs its real unpublished-evaluation check; that workflow has been exercised in simulation. See [the local validation notes](https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/LOCAL_VALIDATION.md) for details.
 
 ## ❓ Can I bulk enter assignment feedback as a TA?
 

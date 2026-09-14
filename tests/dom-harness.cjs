@@ -82,7 +82,7 @@ function createHarness(options = {}) {
     const source = fs.readFileSync(path.join(__dirname, '../brightspace_auto_feedback_injector.user.js'), 'utf8');
     // Execute the complete production core, substituting only the platform reload primitive
     // and suppressing panel mounting. Real panel handlers/reload are exercised in the browser fixture.
-    const exports = ['parseCSV', 'parseGradebookCSV', 'saveStudentDatabase', 'getStudentDatabase', 'getDatabaseRevision',
+    const exports = ['csvImportSummary', 'parseCSV', 'parseGradebookCSV', 'saveStudentDatabase', 'getStudentDatabase', 'getDatabaseRevision',
         'getProcessedMap', 'getAssignmentContextKey', 'clearAllAssignmentData', 'findStudentData', 'pageIdentity',
         'deepQuery', 'feedbackControl', 'overallGradeControl', 'formatFeedbackHtml', 'beginOperation', 'captureTarget',
         'executeFill', 'manualAction', 'startCruise', 'cruiseStep', 'runCruise', 'navigateStudent', 'rewindToFirstStudent',

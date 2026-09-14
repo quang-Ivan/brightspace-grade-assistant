@@ -1,6 +1,6 @@
 # Publication & Search Setup
 
-This is the launch setup for **Brightspace (D2L) CSV Grade & Feedback Auto-Filler**. It is built primarily for teaching assistants; instructors are welcome too. The current public status is recorded below; the remaining sections explain how to maintain each channel.
+This is the launch setup for **Brightspace (D2L) CSV Grade & Feedback Auto-Filler**. It is built primarily for teaching assistants; instructors are welcome too. The historical launch baseline is recorded below; the remaining sections explain how to maintain each channel.
 
 ## Launch status — 2026-09-09
 
@@ -87,3 +87,12 @@ The property is scoped to the project path. A `robots.txt` inside that path woul
 References: [Search Console common tasks](https://support.google.com/webmasters/answer/10351509?hl=en), [ownership verification](https://support.google.com/webmasters/answer/9008080?hl=en), and [Google's SEO starter guide](https://developers.google.com/search/docs/fundamentals/seo-starter-guide). Google does not use the `meta keywords` tag; the page instead answers real CSV/feedback questions in readable text.
 
 Installing or updating the tool is not authorization to publish grades. Keep student-data handling and Brightspace publication separate from publishing this open-source project.
+
+
+## 2026-09-14 update contents
+
+This update pairs the v1.0.5 userscript with the reviewed 37.20-second native-HTML demo. The script repair permits a unique name match when the entire CSV has no IDs, while preserving rejection of actual ID conflicts. The CSV import summary distinguishes scores, zeros, blank-score skips and missing feedback. Syntax and all 45 regression tests passed before publication.
+
+The public media set contains the exact reviewed MP4, its poster, GIF preview, optional English caption track and 20-row fictional CSV. English instructions are also burned into the video, which has no audio stream. The MP4 SHA-256 is `11b1381541649b78d41de6c2477f263c5212882e93dbd101229048bd23b90773`.
+
+GitHub Pages continues to serve `main` from the repository root. Versioned media URLs refresh previously cached players. The existing GitHub push webhook synchronizes the script and listing description to Greasy Fork. Deployment status must be followed by a public-page playback check and comparison of the published media/source with the intended files. Private native exports, replacement maps, local browser output and production recordings are excluded. The recording does not access or save to a real LMS; project publication does not close the separate real draft-save acceptance boundary.

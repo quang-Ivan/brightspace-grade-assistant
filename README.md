@@ -1,7 +1,7 @@
 # 🎓 Brightspace (D2L) CSV Grade & Feedback Auto-Filler
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.0.4-brightgreen.svg)](brightspace_auto_feedback_injector.user.js)
+[![Version](https://img.shields.io/badge/Version-1.0.5-brightgreen.svg)](brightspace_auto_feedback_injector.user.js)
 [![Userscript](https://img.shields.io/badge/Userscript-Violentmonkey%20%7C%20Tampermonkey-green.svg)](brightspace_auto_feedback_injector.user.js)
 [![Privacy: No Tracking](https://img.shields.io/badge/Privacy-No%20Tracking-brightgreen.svg)](#-privacy--local-execution)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-orange.svg)](CONTRIBUTING.md)
@@ -14,11 +14,13 @@ Free and open-source, with no tracking or third-party uploads. One script, no pr
 
 ## 🎬 See it in action
 
-[![The CSV helper filling fictional students' grades and personalized feedback in an anonymized copy of Brightspace's evaluation page](assets/demo/quick-demo.gif)](https://quang-Ivan.github.io/brightspace-grade-assistant/#demo)
+[![The helper fills fictional students’ scores and feedback in the real anonymized Brightspace HTML layout](assets/demo/quick-demo.gif)](https://quang-Ivan.github.io/brightspace-grade-assistant/#demo)
 
-[Watch the captioned video](https://quang-Ivan.github.io/brightspace-grade-assistant/#demo) · [Download the MP4](assets/demo/quick-demo.mp4)
+[Watch the silent demo](https://quang-Ivan.github.io/brightspace-grade-assistant/#demo) · [Download the MP4](assets/demo/quick-demo.mp4) · [Demo transcript](docs/DEMO.md)
 
-Load a CSV → fill the current student's grade and feedback → move to the next student. Recorded with the real script on an **anonymized local copy of Brightspace's evaluation-page HTML**, using fictional students and grading data. It demonstrates field entry, not a live save or a speed benchmark.
+One reviewed CSV → the right student → their score and personalized feedback. This **37-second, 1920×1080 demo** uses numbered steps, a stable full-page view, and visible clicks and keyboard cues. English subtitles and readable result captions are burned in; there is no audio track.
+
+Watch Alice receive 9, Jordan 7 and Sam 10, followed by selected students from a verified 20-person session. The unchanged v1.0.5 production helper performs CSV import, name matching, Fill Current, Next and Alt+F in the **source-anonymized native Brightspace HTML**, retaining its components, Shadow DOM and styles. Selected clips are explicitly labelled and play at their captured speed; the movie duration is not a whole-class timing claim. These are local field fills; no real LMS grade is saved or published. The [demo notes and transcript](docs/DEMO.md) describe the recording, and the [20-row fictional CSV](assets/demo/reviewed-example.csv) contains the example entries.
 
 ---
 
@@ -40,14 +42,14 @@ Install one browser extension to run userscripts:
 
 Open the [**Greasy Fork listing**](https://greasyfork.org/en/scripts/595051-brightspace-d2l-csv-grade-feedback-auto-filler), click **Install this script**, then confirm **Install** in your extension. Your userscript manager can check Greasy Fork for future updates.
 
-Alternatively, use the [v1.0.4 source file](brightspace_auto_feedback_injector.user.js) and the [manual installation steps](docs/USER_GUIDE.md#2-install-this-script). Keep only one copy of the helper enabled.
+Alternatively, use the [v1.0.5 source file](brightspace_auto_feedback_injector.user.js) and the [manual installation steps](docs/USER_GUIDE.md#2-install-this-script). Keep only one copy of the helper enabled.
 
 ### Step 3: Grade in Brightspace!
 
 1. Log into your university's Brightspace as a TA or instructor with assignment-grading permission.
 2. Go to your course ➔ **Assignments** ➔ Click on any student submission to enter **Consistent Evaluation**.
 3. The blue **🎓 Brightspace CSV Grade & Feedback Auto-Filler** panel appears in the bottom-right corner!
-4. Click **📁 Load Gradebook CSV** and select your CSV file.
+4. Click **📁 Load Scores & Feedback CSV** and select your CSV file.
 5. Check the student and preview. On your first run, try **Fill Current → Save Draft** on one unpublished submission and check the result after the page refreshes.
 6. Click **🚀 Start Full Class Auto-Cruise** (or press <kbd>Alt</kbd> + <kbd>A</kbd>). Use **Emergency Stop** whenever you need to pause.
 7. When every intended CSV row is accounted for, a 4-note completion chime plays 🎵. Review the draft, existing-match, explicitly unsubmitted, and **Outside CSV** counts before publishing. Outside CSV pages are not graded and do not count toward CSV completion.
@@ -122,6 +124,8 @@ student,score,reason
 - **`score`**: Numeric points for your assignment, not a percentage or a fraction such as `7/8`. The examples above are out of 100. **For unsubmitted students, leave the score blank; use `0` for an actual zero.**
 - **`reason`**: Plaintext feedback, with CSV quoting for commas, quotes, or line breaks. Blank feedback leaves existing comments unchanged.
 
+> In v1.0.5, a wholly name-only CSV can match a unique displayed name even when the page exposes a school ID. A CSV that supplies IDs still pauses on an actual ID conflict. Prefer official IDs when available.
+
 > [!TIP]
 > You can add an **`OrgDefinedId`** column (e.g. `student,OrgDefinedId,score,reason`) using the values from your official course export. See the [student-ID guide](docs/IN_DEPTH_GUIDE.md#using-student-ids) if two students share a name.
 
@@ -132,7 +136,7 @@ student,score,reason
 Brightspace's native Gradebook Export (`Grades ➔ Export`) produces a format containing `OrgDefinedId`, `Last Name`, `First Name`, and numeric points columns:
 
 ```csv
-OrgDefinedId,Last Name,First Name,Homework 1 Points Grade <Numeric MaxPoints:100>,Feedback,End-of-Line Indicator
+OrgDefinedId,Last Name,First Name,Lab Report 1 Points Grade <Numeric MaxPoints:100>,Feedback,End-of-Line Indicator
 #112233445,Smith,Alice,95.0,"Excellent work! All answers completely correct.",#
 #112233446,Jones,Bob,88.5,"Good job. Note: check units on problem 2.",#
 #112233447,Brown,Charlie,,No submission,#
@@ -159,7 +163,7 @@ OrgDefinedId,Last Name,First Name,Homework 1 Points Grade <Numeric MaxPoints:100
 
 1. In Brightspace, go to **Grades** ➔ **Enter Grades** ➔ **Export**.
 2. Under **Key Field**, select `OrgDefinedId` (or `Both`). Check `Last Name` and `First Name`.
-3. Under **Choose Grades to Export**, check your target Assignment (e.g. `Homework 1`).
+3. Under **Choose Grades to Export**, check your target Assignment (e.g. `Lab Report 1`).
 4. Click **Export to CSV**.
 5. Open in Excel, enter scores, add a `Feedback` column if desired, and save as CSV!
 
@@ -253,7 +257,7 @@ Your CSV, progress, and the **Outside CSV** count are stored under the school's 
 
 ## ✅ Testing & Current Scope
 
-v1.0.4 has automated regression checks and a simulated browser workload. Earlier v1.0.3 live checks covered filling, navigation, and fast skip; they do not constitute live v1.0.4 validation. The complete **Save Draft → refresh → verify** path has been exercised in simulation, but its real unpublished-evaluation check remains outstanding. See the [test results](docs/LOCAL_VALIDATION.md) for details.
+v1.0.5 passes 45 production-core regression tests and a fresh simulated-browser workload. Earlier v1.0.3 live checks covered filling, navigation, and fast skip; they do not constitute live v1.0.5 validation. The complete **Save Draft → refresh → verify** path has been exercised in simulation, but its real unpublished-evaluation check remains outstanding. See the [test results](docs/LOCAL_VALIDATION.md) for details.
 
 ---
 

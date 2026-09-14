@@ -18,6 +18,12 @@ Thumbs.db
 # Sample file exemptions (MUST follow broad wildcard patterns)
 !sample_grades.csv
 !demo_sample_grades.csv
+!assets/demo/reviewed-example.csv
+!tools/demo/native-html-v2/grades.csv
+!tools/demo/native-html-v3/grades.csv
+!tools/demo/native-html-v3/roster.json
+!tools/demo/native-html-v4/grades.csv
+!tools/demo/native-html-v4/roster.json
 
 # Archives & ZIPs
 *.zip

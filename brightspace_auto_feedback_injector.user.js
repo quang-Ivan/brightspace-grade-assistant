@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Brightspace (D2L) CSV Grade & Feedback Auto-Filler
 // @namespace    https://github.com/quang-Ivan/brightspace-grade-assistant
-// @version      1.0.4
+// @version      1.0.5
 // @description  A time-saving tool for TAs: fill Brightspace assignment grades and personalized feedback from CSV. Free, open-source, and no third-party uploads.
 // @author       quang-Ivan
 // @license      MIT
@@ -72,12 +72,23 @@
         return readGradebook()?.revision || null;
     }
 
-    function saveStudentDatabase(students) {
+    function saveStudentDatabase(students, sourceName = '') {
         const ctx = getAssignmentContextKey();
         if (!ctx) throw new Error('Course/assignment context is not identified.');
-        const value = {schemaVersion: SCHEMA_VERSION, revision: makeRevision(), students};
+        const value = {schemaVersion: SCHEMA_VERSION, revision: makeRevision(), students, sourceName: String(sourceName).slice(0, 255)};
         localStorage.setItem('d2l_auto_eval_db_' + ctx, JSON.stringify(value));
         return value;
+    }
+
+    function csvImportSummary() {
+        const book = readGradebook(), rows = Object.values(book?.students || {});
+        const scored = rows.filter(row => row.submitted !== false);
+        return {total: rows.length, scored: scored.length,
+            zero: scored.filter(row => Number(row.score) === 0).length,
+            skipped: rows.length - scored.length,
+            missingFeedback: scored.filter(row => !String(row.reason || '').trim()).length,
+            sourceName: book?.sourceName || '',
+            nameOnly: rows.length > 0 && rows.every(row => !normalizeOrgId(row.orgId))};
     }
 
     function getProgressState() {
@@ -166,8 +177,16 @@
             const id = normalizeOrgId(studentOrgId);
             const byId = entries.filter(([, data]) => data.orgId && normalizeOrgId(data.orgId) === id);
             if (byId.length > 1) return {ambiguous: true, error: 'Duplicate OrgDefinedId.'};
-            if (!byId.length) return byName.length
-                ? {ambiguous: true, error: 'Page name matches a CSV row, but its OrgDefinedId conflicts.'} : null;
+            if (!byId.length) {
+                // A wholly name-only CSV has no ID to contradict the page. Keep
+                // name matching strict, and never apply this fallback to an
+                // ID-bearing (or mixed cached) database with a mismatched ID.
+                const nameOnly = entries.every(([, data]) => !normalizeOrgId(data.orgId));
+                if (nameOnly && byName.length === 1) return {...wrap(byName[0]), matchedBy: 'unique name (CSV has no IDs)'};
+                if (nameOnly && byName.length > 1) return {ambiguous: true, error: 'Name is not unique; import verified OrgDefinedId values.'};
+                return byName.length
+                    ? {ambiguous: true, error: 'Page name matches a CSV row, but its OrgDefinedId conflicts.'} : null;
+            }
             if (byName.length && !byName.some(([key]) => key === byId[0][0])) {
                 return {ambiguous: true, error: 'Page name and OrgDefinedId identify different CSV records.'};
             }
@@ -940,7 +959,7 @@
                 const db = parseGradebookCSV(event.target.result);
                 if (!stillCurrent()) return;
                 // Validate the whole file before committing. New revision invalidates all old progress.
-                saveStudentDatabase(db);
+                saveStudentDatabase(db, file.name || '');
                 clearProcessedMap();
                 updateProgress();
                 setStatus('Loaded ' + Object.keys(db).length + ' CSV rows. No grades were written.', '#198754');
@@ -987,7 +1006,7 @@
 
             panel.innerHTML = `
                 <div id="bs-panel-hdr" style="background:#006fbf; color:#fff; padding:10px 14px; font-weight:bold; cursor:move; display:flex; justify-content:space-between; align-items:center; border-radius:6px 6px 0 0;">
-                    <span>🎓 Brightspace CSV Grade & Feedback Auto-Filler v1.0.4</span>
+                    <span>🎓 Brightspace CSV Grade & Feedback Auto-Filler v1.0.5</span>
                     <button id="bs-panel-min" style="background:none; border:none; color:#fff; font-size:16px; cursor:pointer; font-weight:bold;">–</button>
                 </div>
                 <div id="bs-panel-bdy" style="padding:14px;">
@@ -1082,9 +1101,10 @@
                     <hr style="border:0; border-top:1px solid #eee; margin:10px 0;">
 
                     <!-- CSV Load for Future Homeworks -->
-                    <div style="font-size:11px; color:#666; font-weight:bold; margin-bottom:4px;">📁 Load Gradebook CSV (Stored Locally)</div>
+                    <div style="font-size:11px; color:#666; font-weight:bold; margin-bottom:4px;">📁 Load Scores &amp; Feedback CSV</div>
                     <input type="file" id="bs-csv-file" accept=".csv" style="font-size:11px; width:100%;">
-                    <div id="bs-csv-stats" style="font-size:10px; color:#888; margin-top:4px;">No CSV imported for this assignment</div>
+                    <div style="font-size:11px; color:#555; margin:4px 0;">For this helper, not Grades → Import. Zero is a grade; blank means skip.</div>
+                    <div id="bs-csv-stats" style="font-size:11px; color:#555; margin-top:4px; white-space:pre-line;">No CSV imported for this assignment</div>
                 </div>
             `;
 
@@ -1161,8 +1181,15 @@
                     : '[' + data.matchedBy + '] Score: ' + data.score + ' | ' + (data.reason || '(score only)');
             }
             const stats = document.getElementById('bs-csv-stats');
-            if (stats) stats.textContent = 'Current CSV: ' + Object.keys(db).length + ' rows | ' +
-                (getAssignmentContextKey() || 'unknown assignment') + (getDatabaseRevision() ? '' : ' | Import required (old caches are not trusted)');
+            if (stats) {
+                const summary = csvImportSummary();
+                stats.textContent = getDatabaseRevision()
+                    ? (summary.sourceName || 'Imported CSV') + '\n' + summary.total + ' rows · ' + summary.scored +
+                        ' scores (' + summary.zero + ' zero) · ' + summary.skipped + ' blank / skip · ' +
+                        summary.missingFeedback + ' without feedback\n' + (getAssignmentContextKey() || 'unknown assignment') +
+                        (summary.nameOnly ? ' · unique-name matching' : ' · OrgDefinedId matching')
+                    : 'Import a CSV for this assignment. Old caches are not trusted.';
+            }
             updateProgress();
             if (!restoreStarted) { restoreStarted = true; restorePendingReadback(); }
         }

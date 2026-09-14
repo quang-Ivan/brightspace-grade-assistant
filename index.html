@@ -35,7 +35,7 @@
     },
     "description": "A free userscript for teaching assistants to fill reviewed assignment grades and personalized feedback from CSV into Brightspace.",
     "url": "https://quang-Ivan.github.io/brightspace-grade-assistant/",
-    "softwareVersion": "1.0.4",
+    "softwareVersion": "1.0.5",
     "license": "https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/LICENSE",
     "author": {
       "@type": "Person",
@@ -144,7 +144,7 @@
     .demo-section h2 { font-size: 1.8rem; margin-bottom: 8px; }
     .demo-section > p { color: var(--text-muted); margin-bottom: 20px; }
     .demo-frame { overflow: hidden; border: 1px solid var(--gray-border); border-radius: 12px; background: var(--gray-light); }
-    .demo-frame video { display: block; width: 100%; height: auto; aspect-ratio: 40 / 27; background: #eef5fc; }
+    .demo-frame video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: #eef5fc; }
     figcaption { padding: 14px 18px; color: var(--text-muted); font-size: 14px; }
     .demo-links { margin-top: 14px; font-size: 16px; }
     a { color: #005b9c; }
@@ -283,7 +283,7 @@
   <header>
     <div class="container">
       <div class="badge-bar" style="margin-bottom:16px;">
-        <span class="badge">🚀 v1.0.4</span>
+        <span class="badge">🚀 v1.0.5</span>
         <span class="badge">🔒 No Tracking or Third-Party Uploads</span>
         <span class="badge">⚖️ MIT Open Source</span>
       </div>
@@ -317,16 +317,16 @@
   <main>
     <section class="container demo-section" id="demo" aria-labelledby="demo-title">
       <h2 id="demo-title">From your CSV to each student's feedback</h2>
-      <p>Load your CSV → fill the current student's grade and feedback → move to the next student.</p>
+      <p>Import once. Match the student. Fill their score and feedback together.</p>
       <figure class="demo-frame">
-        <video controls playsinline preload="none" poster="assets/demo/quick-demo.png" aria-label="Brightspace CSV grade and feedback helper demonstration with fictional students">
-          <source src="assets/demo/quick-demo.mp4" type="video/mp4">
-          <track default kind="captions" src="assets/demo/quick-demo.vtt" srclang="en" label="English">
-          Your browser cannot play this video. <a href="assets/demo/quick-demo.mp4">Download the MP4 demonstration</a>.
+        <video controls playsinline preload="none" poster="assets/demo/quick-demo.png?v=11b13815" aria-label="Silent demo using an anonymized copy of the actual Brightspace HTML and fictional students">
+          <source src="assets/demo/quick-demo.mp4?v=11b13815" type="video/mp4">
+          <track kind="captions" src="assets/demo/quick-demo.vtt?v=11b13815" srclang="en" label="English">
+          Your browser cannot play this video. <a href="assets/demo/quick-demo.mp4?v=11b13815">Download the MP4 demonstration</a>.
         </video>
-        <figcaption>Recorded with the real script on an <strong>anonymized local copy of Brightspace's evaluation-page HTML</strong>. All students and grading data are fictional. This demonstrates field entry, not a live Brightspace save or a speed benchmark.</figcaption>
+        <figcaption>A <strong>37-second walkthrough</strong> with v1.0.5 in an anonymized copy of the real Brightspace page. One CSV supplies scores and individual feedback for <strong>20 fictional students</strong>; selected students are shown at their captured speed. Numbered steps and visible clicks guide you. English captions are burned in. No audio, grades saved or evaluations published.</figcaption>
       </figure>
-      <p class="demo-links"><a href="#install">Get the script</a> · <a href="sample_grades.csv" download>Download a sample CSV</a> · <a href="https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/USER_GUIDE.md">Read the user guide</a></p>
+      <p class="demo-links"><a href="#install">Get the script</a> · <a href="sample_grades.csv" download>Download a sample CSV</a> · <a href="https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/DEMO.md">Demo transcript</a> · <a href="https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/USER_GUIDE.md">Read the user guide</a></p>
     </section>
     <div class="container">
       <h2 style="text-align:center; font-size:2rem; margin-bottom:10px;">You did the grading. Let the helper do the typing.</h2>
@@ -415,7 +415,7 @@
           <div class="step-content">
             <h4>Open Brightspace & Start Cruising</h4>
             <p>
-              Open one student's assignment evaluation, not the class list. Use <strong>📁 Load Gradebook CSV</strong> and check the preview. Verify one unpublished submission with <strong>Fill Current → Save Draft</strong> before starting <strong>🚀 Auto-Cruise</strong> (or <code>Alt + A</code>).
+              Open one student's assignment evaluation, not the class list. Use <strong>📁 Load Scores & Feedback CSV</strong> and check the preview. Verify one unpublished submission with <strong>Fill Current → Save Draft</strong> before starting <strong>🚀 Auto-Cruise</strong> (or <code>Alt + A</code>).
             </p>
           </div>
         </div>
@@ -472,7 +472,7 @@
       <p style="color:var(--text-muted); font-size:14px; margin-bottom:8px;">
         If you exported your roster from Brightspace, keep one grade column and optionally add <code>Feedback</code>. A blank feedback cell leaves existing feedback unchanged. Use the exact grade heading from your export:
       </p>
-      <pre><code>OrgDefinedId,Last Name,First Name,Homework 1 Points Grade &lt;Numeric MaxPoints:100&gt;,Feedback,End-of-Line Indicator
+      <pre><code>OrgDefinedId,Last Name,First Name,Lab Report 1 Points Grade &lt;Numeric MaxPoints:100&gt;,Feedback,End-of-Line Indicator
 #112233445,Smith,Alice,95.0,"Excellent work! All answers completely correct.",#
 #112233446,Jones,Bob,88.5,"Good job. Note: check units on problem 2.",#
 #112233447,Brown,Charlie,,No submission,#</code></pre>
@@ -566,7 +566,7 @@
         <div class="faq-answer">With fast skip enabled, matching grades and feedback are skipped. A mismatch pauses the helper; it does not click Update. An unsaved fill is not treated as an existing match.</div>
       </div>
       <p style="margin-top:24px; color:var(--text-muted); font-size:14px;">
-        <strong>Testing:</strong> v1.0.4 includes automated regression checks and simulated-browser coverage. Earlier v1.0.3 live checks covered filling, navigation, and fast skip; they are not live v1.0.4 validation. The Save Draft and refresh workflow still needs its real unpublished-evaluation check.
+        <strong>Testing:</strong> v1.0.5 includes automated regression checks and simulated-browser coverage. Earlier v1.0.3 live checks covered filling, navigation, and fast skip; they are not live v1.0.5 validation. The Save Draft and refresh workflow still needs its real unpublished-evaluation check.
         <a href="https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/LOCAL_VALIDATION.md">See the testing details</a>.
       </p>
     </div>

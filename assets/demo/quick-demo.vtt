@@ -1,20 +1,22 @@
 WEBVTT
 
-00:00.000 --> 00:05.000
-Import your reviewed grades and personalized comments from CSV.
+00:00:00.000 --> 00:00:04.362
+Import the reviewed CSV
 
-00:05.000 --> 00:08.000
-The helper matches the current student to the correct CSV row.
+00:00:04.362 --> 00:00:07.001
+Match the current student
 
-00:08.000 --> 00:14.000
-Fill Current enters Alice's score and feedback into the evaluation fields.
+00:00:07.001 --> 00:00:13.001
+One click fills both fields
 
-00:14.000 --> 00:19.000
-Move to the next student. The helper finds Jordan's own row.
+00:00:13.001 --> 00:00:19.001
+Next student. Different score and feedback.
 
-00:19.000 --> 00:25.000
-Fill Jordan's score and personalized feedback without copying and pasting.
+00:00:19.001 --> 00:00:23.001
+Next, then fill — from the keyboard.
 
-00:25.000 --> 00:27.880
-You do the grading. The helper does the typing.
-Fictional data; local field entry only, no LMS save or publication.
+00:00:23.001 --> 00:00:34.097
+Same CSV · Selected students shown
+
+00:00:34.097 --> 00:00:37.200
+20 entries filled. Review before saving.

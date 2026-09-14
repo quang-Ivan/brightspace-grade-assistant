@@ -55,6 +55,35 @@ test('duplicate IDs and normalized name-only collisions block; equal names with 
     assert.equal(h.api.findStudentData('Alex Smith', db).ambiguous, true);
 });
 
+test('name-only CSV can fill a unique name even when the page exposes an OrgDefinedId', async t => {
+    const h = fixture(t, {name: 'Alice Smith', orgId: '001'});
+    h.importCSV('student,score,reason\nAlice Smith,8,Correct work.');
+    const match = h.api.findStudentData('Smith, Alice', h.api.getStudentDatabase(), '001');
+    assert.equal(match?.ambiguous, undefined);
+    assert.equal(match?.key, 'name:alice smith');
+    await h.api.manualAction('fill');
+    assert.equal(h.grade.value, '8');
+    assert.match(h.editor.html, /Correct work/);
+    assert.equal(h.saveClicks, 0);
+});
+
+test('name-only mode still rejects ambiguous names and does not match unrelated students', t => {
+    const h = fixture(t);
+    const db = h.api.parseGradebookCSV('student,score,reason\nAlice Smith,0,Zero is intentional.');
+    assert.equal(h.api.findStudentData('Alice Smith', db, '009')?.score, '0');
+    assert.equal(h.api.findStudentData('Someone Else', db, '009'), null);
+    db['second-alice'] = {...db['name:alice smith']};
+    assert.equal(h.api.findStudentData('Alice Smith', db, '009')?.ambiguous, true);
+});
+
+test('a mixed or ID-bearing database cannot use a missing ID row to evade page-ID conflicts', t => {
+    const h = fixture(t);
+    const db = h.api.parseGradebookCSV('student,OrgDefinedId,score\nBob Jones,002,9');
+    db['name:alice smith'] = {name: 'Alice Smith', orgId: null, score: '8', submitted: true, reason: ''};
+    assert.equal(h.api.findStudentData('Alice Smith', db, '001')?.ambiguous, true);
+    assert.equal(h.api.findStudentData('Alice Smith', db, '002')?.ambiguous, true);
+});
+
 test('explicit page ID mismatch and conflicting name/ID never fall back silently', t => {
     const h = fixture(t);
     const db = h.api.parseGradebookCSV('student,OrgDefinedId,score\nAlice Smith,001,95\nBob Jones,002,77');
@@ -465,4 +494,27 @@ test('score maximum is checked before either field is changed; score-only fill n
     h.editor.parentElement.remove();
     await h.api.manualAction('fill');
     assert.equal(h.grade.value, '95'); assert.equal(h.saveClicks, 0);
+});
+
+
+test('import summary distinguishes actual zeros, blank skips, and missing feedback and keeps filename', t => {
+    const h = fixture(t);
+    const db = h.api.parseGradebookCSV('student,score,reason\nAlice,0,No submission: zero assigned.\nBob,,Skip for now.\nCara,8,');
+    h.api.saveStudentDatabase(db, 'reviewed-grades.csv');
+    const summary = h.api.csvImportSummary();
+    assert.equal(summary.total, 3); assert.equal(summary.scored, 2);
+    assert.equal(summary.zero, 1); assert.equal(summary.skipped, 1);
+    assert.equal(summary.missingFeedback, 1); assert.equal(summary.nameOnly, true);
+    assert.equal(summary.sourceName, 'reviewed-grades.csv');
+    assert.equal(h.grade.value, ''); assert.equal(h.saveClicks, 0);
+});
+
+test('valid reimport replaces filename and import summary without changing grade fields', t => {
+    const h = fixture(t);
+    h.api.saveStudentDatabase(h.api.parseGradebookCSV(CSV), 'old.csv');
+    h.w.FileReader = class { readAsText(file) { this.onload({target: {result: file.text}}); } };
+    h.api.loadCSVFile({target: {files: [{name: 'new.csv', size: 30, text: CSV}]}});
+    assert.equal(h.api.csvImportSummary().sourceName, 'new.csv');
+    assert.equal(h.api.csvImportSummary().nameOnly, false);
+    assert.equal(h.grade.value, ''); assert.equal(h.saveClicks, 0);
 });

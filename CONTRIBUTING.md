@@ -22,7 +22,7 @@ Keep changes consistent with [`README.md`](README.md) and [`docs/IN_DEPTH_GUIDE.
 - A fresh native save acknowledgement must be followed by a full reload and same student/course/assignment/CSV-revision score-and-feedback readback before Auto-Cruise resumes.
 - Unrecognized acknowledgements, failed or mismatched readback, identity conflicts, unexpected dialogs, and navigation timeouts pause the run. Emergency Stop invalidates pending continuations but cannot recall autosave or save requests already sent.
 - Mutations are limited to the unique overall grade and overall feedback controls. Rubric criteria and unrelated editors must remain untouched.
-- CSV import has one unambiguous grade column. Duplicate IDs block the whole import; distinct IDs may disambiguate identical names; no-ID names must be unique after normalization. An explicit page-ID mismatch never falls back to a name. Only a genuinely absent page ID permits unique-name fallback.
+- CSV import has one unambiguous grade column. Duplicate IDs block the whole import; distinct IDs may disambiguate identical names; no-ID names must be unique after normalization. An explicit page-ID mismatch never falls back to a name. Unique-name fallback is allowed when the page ID is absent or the entire CSV is name-only. A CSV that supplies IDs never falls back after an ID conflict.
 - Blank scores mean explicitly unsubmitted. Invalid nonblank scores block import rather than being silently skipped. Reason/Feedback is plaintext with safe CSV quoting and escaped line breaks, not arbitrary HTML.
 - Do not reintroduce a default sample database that can write grades. A real task CSV must be imported, and old cache/progress must not be treated as verified after schema or record-contract changes.
 
@@ -36,7 +36,7 @@ npm run check
 npm test
 ```
 
-The 34 DOM/lifecycle tests execute the production core with jsdom and controlled timers, covering CSV staging, identity conflicts, unique overall-control selection, exact Save Draft selection, reload/readback, dialogs, cancellation, and the live-page navigation and fast-skip regressions. The separate browser fixture exercises the unmodified userscript, real Shadow DOM, native file input, full reloads, and local server-stored drafts:
+The 45 DOM/lifecycle tests execute the production core with jsdom and controlled timers, covering CSV staging, identity conflicts, unique overall-control selection, exact Save Draft selection, reload/readback, dialogs, cancellation, and the live-page navigation and fast-skip regressions. The separate browser fixture exercises the unmodified userscript, real Shadow DOM, native file input, full reloads, and local server-stored drafts:
 
 ```bash
 node tests/fixture-server.cjs 0
@@ -59,6 +59,19 @@ Before handing off a local change, check:
 - version numbers and feature descriptions match the userscript;
 - installation links point to the actual project listing, and no unsupported fixed-speed claims were added;
 - tests cover the changed behavior and no live browser/LMS mutation was performed unintentionally.
+
+## Product-demo requirements
+
+- Write the benefit-driven storyboard before recording, including the actual per-scene action, distinct student results, exact English subtitle, timing and verification. Keep the scene plan with the local recording sources; publish the resulting [demo transcript](docs/DEMO.md). Subtitles must be visibly burned into the MP4 for the entire timeline; a separate VTT/SRT file alone is not acceptance.
+
+- **No TTS, narration, music or audio track.** Use short, readable on-screen instructions.
+- **Use an anonymized HTML copy of the real Brightspace page.** Preserve native D2L components, named slots, Shadow DOM, adopted stylesheets, layout, toolbar icons and field appearance. Replace private names, IDs, filenames, dates, submission content and feedback in the detached DOM with clearly fictional example data before recording.
+- **Do not use large masks, blur blocks or “hidden for privacy” panels as the product-demo solution.** Those destroy the fields the video is meant to demonstrate. Source-level anonymization—not pixel obstruction—is the default. Native screenshots alone do not replace the needed interactive HTML source.
+- A local HTML replica exported from the real page is not a redesigned synthetic LMS. Existing `tests/fixtures/evaluation.html` remains a regression fixture only; it is not acceptable product-demo UI.
+- Remove live page scripts, credentials, private URL values and network side effects from the exported copy. Run the current production userscript on loopback with fictional CSV data. Do not type example grades into a real student's evaluation.
+- The movie must actually demonstrate CSV loading, matching a student, filling the visible grade and feedback, and moving to another student's distinct row. A read-only pan across blocked-out fields is not an acceptable substitute for that workflow.
+- Keep the HTML snapshot, anonymization checks, local adapter, capture script and source/plugin hashes with the workflow. Never store the only reproducible source under `/tmp` or rely on a previous video to reconstruct it. Label original recorded versions honestly; do not redraw version labels or fabricate saving/publishing.
+- The current demo is the 37.20-second v1.0.5 native-HTML recording. Publish its reviewed MP4, matching poster/preview, captions and fictional example CSV from `assets/demo/`. Keep private page exports, replacement maps, recordings and local production files out of the public repository; retain the reproducible source package locally.
 
 ## 📦 Publishing the project
 

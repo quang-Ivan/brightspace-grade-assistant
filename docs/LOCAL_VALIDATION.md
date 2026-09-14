@@ -1,6 +1,6 @@
 # Testing & Current Scope
 
-The initial v1.0.1 simulation and subsequent bounded live-page checks were performed on 2026-09-08. No grades were published. Those checks did not include a GitHub push or hosted deployment; the project's subsequent public launch is recorded separately in [Publication & Search Setup](PUBLISHING.md#launch-status--2026-09-08). Student identities and feedback are intentionally omitted here.
+The initial v1.0.1 simulation and subsequent bounded live-page checks were performed on 2026-09-08. No grades were published. Those checks did not include a GitHub push or hosted deployment; the project's subsequent public launch is recorded separately in [Publication & Search Setup](PUBLISHING.md#launch-status--2026-09-09). Student identities and feedback are intentionally omitted here.
 
 ## Automated regression checks
 
@@ -57,3 +57,21 @@ This is local browser evidence, not an additional live Brightspace save test. Th
 ## Remaining acceptance boundary
 
 Real draft saving and post-save reload verification remain unperformed: submitted evaluations in this assignment were already published, and the remaining rows were unsubmitted. Neither published records nor unsubmitted grades were changed to manufacture a test case. The script depends on recognizable English evaluation identity, unique overall controls, an exact enabled Save Draft button, and a fresh supported native acknowledgement. A tenant with another layout or wording may pause and require adaptation. These checks do not prove a live save, publication/release, Gradebook synchronization, student visibility, institutional compliance, or permanent persistence.
+
+
+## v1.0.5 local repair and demo — 2026-09-12
+
+A focused reproduction showed that the documented name-only CSV was rejected whenever the evaluation page exposed an OrgDefinedId, even though no conflicting ID had been supplied. The new regression tests first failed on the unchanged source. The repair permits a unique normalized-name match only for a wholly name-only CSV; ID-bearing/mixed databases still pause on actual ID conflicts, and ambiguous names remain blocked.
+
+All **45** production-core tests and the syntax check pass. New import-summary tests also cover filename replacement, actual zero grades, blank-score skips, missing feedback, and absence of field writes during import.
+
+A new isolated headless Chrome recording exercises the complete unmodified v1.0.5 userscript on the local fixture. Its separately opened name-only browser smoke test matched and filled the correct student without saving. The main recording imported six fictional rows, manually filled/saved/reloaded the first draft, selected the next student's separate row, and completed Auto-Cruise with **5 saved, reload-verified drafts and 1 blank-score skip**. The local server observed exactly five save requests. The zero grade persisted, both identically named students retained their own IDs and feedback, all saved values matched the CSV, and the unrelated rubric note stayed unchanged.
+
+The recording adds only presentation CSS, a fictional CSV preview, pointer highlights, and explanatory titles. It does not fake save acknowledgements or replace the userscript's grading/identity logic. The loopback fixture—not Brightspace—provides the draft server. No authenticated browser profile, real student records, or real LMS save was used. The separate live draft-save acceptance boundary above remains open.
+
+
+## Native HTML demo revision — 2026-09-14
+
+The 37.20-second demo uses source-anonymized native Brightspace HTML and the unchanged v1.0.5 userscript. Its 20 fictional score/feedback readbacks passed; selected students are explicitly disclosed in the edit. The camera retains the full page for 91.9% of the movie, with one three-second detail. Full decode, burned-caption and actual-input checks, source privacy checks, and the actual 960×540 player with optional CC off passed. The final MP4 was reviewed again after the clip and subtitle corrections; that review checked the exact file hash, decoded all 1,116 frames and inspected adjacent frames at the corrected transitions. No further media changes followed that review.
+
+The review used decoding and frame inspection, not a continuous first-time human viewing test. An independent new-viewer comprehension test remains unperformed. There is no audio stream and no live LMS access, save or publication in this offline recording. The separate real draft-save acceptance boundary above remains open. See [the demo notes and transcript](DEMO.md).

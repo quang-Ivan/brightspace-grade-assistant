@@ -1,6 +1,6 @@
 # In-Depth Guide: Brightspace (D2L) CSV Grade & Feedback Auto-Filler
 
-> Technical reference for v1.0.4. For installation and everyday use, start with the [step-by-step user guide](USER_GUIDE.md).
+> Technical reference for v1.0.5. For installation and everyday use, start with the [step-by-step user guide](USER_GUIDE.md).
 
 This advanced guide explains student matching, local state, CSV validation, and the verified-save state machine. Brightspace layouts and controls can differ by institution and course configuration.
 
@@ -67,7 +67,7 @@ Rows are staged before the existing local database or progress state is replaced
 
 Completely empty CSV lines identify no student and are ignored. They do not create an unsubmitted row or a completion obligation.
 
-Identical display names are allowed when distinct supported IDs disambiguate them. If an ID is genuinely absent on the page, the script may use a unique normalized name. It must not fall back to a name when an ID is present but mismatched or when multiple records remain possible.
+Identical display names are allowed when distinct supported IDs disambiguate them. If the entire CSV has no IDs, a unique normalized name may match even when the page exposes an ID; a missing CSV ID is not a conflicting ID. An ID-bearing CSV may use a unique name only when the page ID is absent. It must not fall back after an actual ID conflict or when multiple records remain possible.
 
 ### Using student IDs
 
@@ -112,6 +112,10 @@ student,score,reason
 
 Note for improvement: show the intermediate calculation on the next revision."
 ```
+
+### Import summary
+
+v1.0.5 records the local CSV file name and displays row, numeric-score, zero-grade, blank-skip, and missing-feedback counts. The filename is presentation metadata, not an identity key or proof of assignment provenance. Existing per-course/assignment/CSV-revision checks still apply. Importing changes only the helper's local CSV cache; it does not fill LMS fields.
 
 ### Revision scope
 
@@ -187,6 +191,6 @@ The project makes no blanket claim of FERPA/GDPR compliance, 100% security, perm
 
 The local project includes automated regression checks with controlled timers, plus a separate browser fixture that runs the unmodified userscript against synthetic server-stored drafts. Coverage includes identity conflicts, strict/staged CSV import, unique controls, reload/readback, dialogs, cancellation, partial CSV traversal, and Outside CSV accounting. See [validation results](LOCAL_VALIDATION.md) and [test commands](../CONTRIBUTING.md).
 
-Automated tests provide local evidence only. Earlier v1.0.3 live-page testing covered filling, navigation, and fast skip; it is not live v1.0.4 validation. Real draft saving and post-save readback remain unverified. A live run should record the actual tenant controls, the exact course/assignment context, save acknowledgement, post-reload readback, and any remaining paused state.
+Automated tests provide local evidence only. Earlier v1.0.3 live-page testing covered filling, navigation, and fast skip; it is not live v1.0.5 validation. Real draft saving and post-save readback remain unverified. A live run should record the actual tenant controls, the exact course/assignment context, save acknowledgement, post-reload readback, and any remaining paused state.
 
 For implementation details, inspect [`brightspace_auto_feedback_injector.user.js`](../brightspace_auto_feedback_injector.user.js), the local [`README.md`](../README.md), and the fictional [`sample_grades.csv`](../sample_grades.csv).
