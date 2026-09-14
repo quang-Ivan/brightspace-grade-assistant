@@ -1,7 +1,7 @@
 # 🎓 Brightspace (D2L) CSV Grade & Feedback Auto-Filler
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.0.5-brightgreen.svg)](brightspace_auto_feedback_injector.user.js)
+[![Version](https://img.shields.io/badge/Version-1.0.6-brightgreen.svg)](brightspace_auto_feedback_injector.user.js)
 [![Userscript](https://img.shields.io/badge/Userscript-Violentmonkey%20%7C%20Tampermonkey-green.svg)](brightspace_auto_feedback_injector.user.js)
 [![Privacy: No Tracking](https://img.shields.io/badge/Privacy-No%20Tracking-brightgreen.svg)](#-privacy--local-execution)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-orange.svg)](CONTRIBUTING.md)
@@ -42,7 +42,7 @@ Install one browser extension to run userscripts:
 
 Open the [**Greasy Fork listing**](https://greasyfork.org/en/scripts/595051-brightspace-d2l-csv-grade-feedback-auto-filler), click **Install this script**, then confirm **Install** in your extension. Your userscript manager can check Greasy Fork for future updates.
 
-Alternatively, use the [v1.0.5 source file](brightspace_auto_feedback_injector.user.js) and the [manual installation steps](docs/USER_GUIDE.md#2-install-this-script). Keep only one copy of the helper enabled.
+Alternatively, use the [v1.0.6 source file](brightspace_auto_feedback_injector.user.js) and the [manual installation steps](docs/USER_GUIDE.md#2-install-this-script). Keep only one copy of the helper enabled.
 
 ### Step 3: Grade in Brightspace!
 
@@ -257,7 +257,7 @@ Your CSV, progress, and the **Outside CSV** count are stored under the school's 
 
 ## ✅ Testing & Current Scope
 
-v1.0.5 passes 45 production-core regression tests and a fresh simulated-browser workload. Earlier v1.0.3 live checks covered filling, navigation, and fast skip; they do not constitute live v1.0.5 validation. The complete **Save Draft → refresh → verify** path has been exercised in simulation, but its real unpublished-evaluation check remains outstanding. See the [test results](docs/LOCAL_VALIDATION.md) for details.
+v1.0.6 fixes a native feedback-change notification defect that could save the score while leaving feedback empty, then pause Auto-Cruise at reload verification. All 47 production-core regression tests pass. The fix was also checked against the currently loaded native Brightspace components without connecting test content to a real evaluation. The complete **Save Draft → refresh → verify** path has been exercised in simulation; a real save with this version remains unverified. See the [test results](docs/LOCAL_VALIDATION.md) for details. The demo records v1.0.5 field filling only.
 
 ---
 

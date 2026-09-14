@@ -1,5 +1,21 @@
 # Testing & Current Scope
 
+## v1.0.6 feedback notification repair — 2026-09-14
+
+A live v1.0.5 Auto-Cruise run stopped at reload verification: the score was present but the expected nonempty feedback was absent. Inspection of the currently loaded native Brightspace component identified the cause. Its blur handler compares `editor.html` with the panel's `_feedbackText` (the last-notified value) and only emits `d2l-consistent-eval-feedback-edit` when those values differ. The helper's compatibility bridge assigned `_feedbackText` before emitting blur. When the HTML strings matched, it suppressed the native model update even though the editor displayed the text. Saving could therefore persist the score with empty feedback.
+
+v1.0.6 removes that private-cache assignment from the shared feedback writer used by Fill Current, Fill & Save, and Auto-Cruise. The native panel owns its change tracking and emits the evaluation edit. Save acknowledgement, full reload, identity checks, and matching readback requirements are unchanged.
+
+The old source failed both new regression tests: a plain feedback fill left the evaluation model empty, and Auto-Cruise saved empty model feedback. The fixed source passes all **47** production-core tests and the syntax check. The tests and browser fixture now distinguish editor HTML from the notified evaluation model; draft saving consumes that model. Single-paragraph and escaped multiline feedback, native duplicate-event suppression, zero grades, and unrelated rubric preservation are covered.
+
+A second check used the actual loaded Brightspace component classes with fictional content in detached elements. The old cache assignment produced zero native feedback-edit events; leaving the cache to the native handler produced exactly one, including after a repeated blur. The elements were never connected to a real evaluation, and this check made no real grade or feedback save.
+
+The complete v1.0.6 userscript then ran in Chrome on the loopback fixture with its six fictional CSV rows. Auto-Cruise completed **5 reload-verified drafts, 1 blank-score skip, and 0 rows remaining**. The server received exactly five saves; every saved score and feedback matched the corresponding CSV row, including zero, multiline text, and the two students sharing a name. The fixture used its root URL with assignment query parameters so the older installed userscript could not also inject through its `/d2l/` match.
+
+This confirms the native notification defect and its repair, plus the complete local save/reload workflow. A real LMS Save Draft with v1.0.6 was not performed during this repair; permanent persistence and publication are not claimed. No private student data is included in the regression fixtures or public documentation. The existing demo remains an accurate recording of v1.0.5 field filling.
+
+## Earlier checks
+
 The initial v1.0.1 simulation and subsequent bounded live-page checks were performed on 2026-09-08. No grades were published. Those checks did not include a GitHub push or hosted deployment; the project's subsequent public launch is recorded separately in [Publication & Search Setup](PUBLISHING.md#launch-status--2026-09-09). Student identities and feedback are intentionally omitted here.
 
 ## Automated regression checks

@@ -101,9 +101,9 @@
           const shadow = this.attachShadow({mode: 'open'});
           shadow.innerHTML = '<style>:host{display:block}.content{box-sizing:border-box;min-height:96px;padding:10px;border:1px solid #8699a8;border-radius:4px;background:#fff;outline:none;white-space:pre-wrap}</style><div class="content" contenteditable="true"></div>';
           this.content = shadow.querySelector('.content');
-          this.content.addEventListener('input', () => this.dispatchEvent(new Event('input', {bubbles: true, composed: true})));
+          this.content.addEventListener('input', () => { this._html = this.content.innerHTML; this.dispatchEvent(new Event('input', {bubbles: true, composed: true})); });
           this.content.addEventListener('change', () => this.dispatchEvent(new Event('change', {bubbles: true, composed: true})));
-          this.content.addEventListener('blur', () => this.dispatchEvent(new Event('blur', {bubbles: true, composed: true})));
+          this.content.addEventListener('blur', () => this.dispatchEvent(new Event('d2l-htmleditor-blur', {bubbles: true, composed: true})));
         }
         get html() { return this._html || ''; }
         set html(value) { this._html = String(value ?? ''); this.content.innerHTML = this._html; }
@@ -111,6 +111,20 @@
       customElements.define('d2l-input-number', D2lInputNumber);
       customElements.define('d2l-htmleditor', D2lHtmlEditor);
       rubricFeedback.html = '<p>Unrelated rubric note must stay unchanged.</p>';
+
+      // Match the native consumer boundary: displaying HTML does not update
+      // the saved evaluation model until the panel emits a feedback edit.
+      overallFeedback.addEventListener('d2l-htmleditor-blur', () => {
+        const html = overallFeedback.html;
+        if (overallPanel._feedbackText === html) return;
+        overallPanel._feedbackText = html;
+        overallPanel.dispatchEvent(new CustomEvent('d2l-consistent-eval-feedback-edit', {
+          bubbles: true, composed: true, detail: {feedback: html, files: []}
+        }));
+      });
+      overallPanel.addEventListener('d2l-consistent-eval-feedback-edit', event => {
+        state.feedbackHtml = event.detail.feedback;
+      });
 
       function current() { return state.students[state.index]; }
       function clearNotices() { notices.replaceChildren(); }
@@ -136,11 +150,15 @@
         if (!student) return;
         state.busy = true; app.setAttribute('aria-busy', 'true'); loading.hidden = false;
         updateIdentity(student); grade.value = ''; overallFeedback.html = '';
+        overallPanel._feedbackText = ''; state.feedbackHtml = '';
         const load = readDraft(student.OrgDefinedId); state.currentLoad = load;
         try {
           const draft = await load;
           if (state.currentLoad === load && current().OrgDefinedId === student.OrgDefinedId) {
-            if (draft) { grade.value = draft.score; overallFeedback.html = draft.feedbackHtml; }
+            if (draft) {
+              grade.value = draft.score; overallFeedback.html = draft.feedbackHtml;
+              overallPanel._feedbackText = draft.feedbackHtml; state.feedbackHtml = draft.feedbackHtml;
+            }
           }
         } finally {
           if (state.currentLoad === load) { state.busy = false; app.removeAttribute('aria-busy'); loading.hidden = true; updateIdentity(student); }
@@ -177,7 +195,7 @@
       document.getElementById('save-draft')?.addEventListener('click', async () => {
         clearNotices();
         const student = current();
-        const payload = {student: student.student, OrgDefinedId: student.OrgDefinedId, score: grade.value, feedbackHtml: overallFeedback.html, mode: state.mode};
+        const payload = {student: student.student, OrgDefinedId: student.OrgDefinedId, score: grade.value, feedbackHtml: state.feedbackHtml, mode: state.mode};
         try {
           const response = await fetch('/api/drafts', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(payload)});
           const result = await response.json();

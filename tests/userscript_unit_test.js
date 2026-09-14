@@ -304,11 +304,41 @@ test('native save error and edits during acknowledgment prevent reload/completio
 async function acknowledgedSave(t, {csv = CSV, name = 'Alice Smith', orgId = '001'} = {}) {
     const h = fixture(t, {name, orgId}); h.importCSV(csv);
     let stored;
-    h.onSave = () => { stored = {score: h.grade.value, feedback: h.editor.html}; h.signal('Draft saved'); };
+    h.onSave = () => { stored = {score: h.grade.value, feedback: h.feedbackModel}; h.signal('Draft saved'); };
     const operation = h.api.manualAction('fill-save'); await h.advance(1000); await operation;
     assert.equal(h.reloads, 1); assert.equal(h.api.progressSummary().verified, 0);
     return {h, stored, pending: h.session.getItem(PENDING_KEY)};
 }
+
+test('feedback fill notifies the native evaluation model for plain and multiline text', async t => {
+    for (const reason of ['A specific individual comment.', 'A < B & C\nSecond line']) {
+        const h = fixture(t);
+        h.importCSV('student,OrgDefinedId,score,reason\nAlice Smith,001,8,"' + reason.replace(/"/g, '""') + '"');
+        await h.api.manualAction('fill');
+        assert.equal(h.feedbackModel, h.api.formatFeedbackHtml(reason));
+        assert.equal(h.feedbackEdits.length, 1);
+        // Repeated blur must retain native duplicate-event suppression.
+        h.editor.dispatchEvent(new h.w.CustomEvent('d2l-htmleditor-blur'));
+        assert.equal(h.feedbackEdits.length, 1);
+        assert.equal(h.saveClicks, 0);
+        assert.equal(h.rubric.html, '<p>Keep this rubric feedback</p>');
+    }
+});
+
+test('auto-cruise saves the native feedback model and verifies it after reload', async t => {
+    const h = fixture(t); h.importCSV(CSV);
+    h.next.disabled = true;
+    let stored;
+    h.onSave = () => { stored = {score: h.grade.value, feedback: h.feedbackModel}; h.signal('Draft saved'); };
+    const run = h.api.startCruise(); await h.advance(1500); await run;
+    assert.equal(h.saveClicks, 1); assert.equal(h.reloads, 1);
+    assert.equal(stored.feedback, '<p>Good work</p>');
+    const reloaded = fixture(t, {local: h.local, session: h.session, navigationType: 'reload', ...stored});
+    reloaded.next.disabled = true;
+    const verify = reloaded.api.restorePendingReadback(); await reloaded.advance(1000); await verify;
+    assert.equal(reloaded.api.progressSummary().verified, 1);
+    assert.equal(reloaded.saveClicks, 0);
+});
 
 test('only matching reload readback records verification, including zero and escaped multiline feedback', async t => {
     const {h, stored} = await acknowledgedSave(t, {csv: 'student,OrgDefinedId,score,reason\nAlice Smith,001,0,"A < B & C\nSecond line"'});

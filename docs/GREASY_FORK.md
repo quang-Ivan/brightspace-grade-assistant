@@ -64,7 +64,7 @@ Imported rows, progress, and the current CSV revision's **Outside CSV** count st
 - [Source code and documentation](https://github.com/quang-Ivan/brightspace-grade-assistant)
 - [Testing details](https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/LOCAL_VALIDATION.md)
 
-Designed for the English-language Consistent Evaluation interface. v1.0.5 has automated regression checks and simulated-browser coverage. Earlier v1.0.3 live checks covered filling, navigation, and fast skip; they are not live v1.0.5 validation. The complete Save Draft and refresh path still needs its real unpublished-evaluation check; that workflow has been exercised in simulation. See [the local validation notes](https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/LOCAL_VALIDATION.md) for details.
+Designed for the English-language Consistent Evaluation interface. v1.0.6 fixes missing feedback-change notifications that could leave feedback empty and pause Auto-Cruise after saving. All 47 regression tests pass; the notification fix was also checked against native Brightspace components isolated from real evaluations. The complete Save Draft and refresh path has simulation coverage; a real save with this version remains unverified. See [the local validation notes](https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/LOCAL_VALIDATION.md) for details. The video records v1.0.5 field filling.
 
 ## ❓ Can I bulk enter assignment feedback as a TA?
 

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Brightspace (D2L) CSV Grade & Feedback Auto-Filler
 // @namespace    https://github.com/quang-Ivan/brightspace-grade-assistant
-// @version      1.0.5
+// @version      1.0.6
 // @description  A time-saving tool for TAs: fill Brightspace assignment grades and personalized feedback from CSV. Free, open-source, and no third-party uploads.
 // @author       quang-Ivan
 // @license      MIT
@@ -400,8 +400,9 @@
                 control.iframe.contentDocument.body.innerHTML = html;
             }
             if (!guardTarget(op, target)) return false;
-            // Compatibility bridge is restricted to the single resolved Overall Feedback panel.
-            if (control.panel && '_feedbackText' in control.panel) control.panel._feedbackText = html;
+            // The native blur handler compares editor.html with its last-notified
+            // _feedbackText, then emits the evaluation-model edit. Never prefill
+            // that cache: doing so suppresses the event Save Draft depends on.
             for (const event of ['input', 'change', 'd2l-htmleditor-blur']) {
                 if (!guardTarget(op, target)) return false;
                 editor.dispatchEvent(new CustomEvent(event, {bubbles: true, composed: true}));
@@ -1006,7 +1007,7 @@
 
             panel.innerHTML = `
                 <div id="bs-panel-hdr" style="background:#006fbf; color:#fff; padding:10px 14px; font-weight:bold; cursor:move; display:flex; justify-content:space-between; align-items:center; border-radius:6px 6px 0 0;">
-                    <span>🎓 Brightspace CSV Grade & Feedback Auto-Filler v1.0.5</span>
+                    <span>🎓 Brightspace CSV Grade & Feedback Auto-Filler v1.0.6</span>
                     <button id="bs-panel-min" style="background:none; border:none; color:#fff; font-size:16px; cursor:pointer; font-weight:bold;">–</button>
                 </div>
                 <div id="bs-panel-bdy" style="padding:14px;">

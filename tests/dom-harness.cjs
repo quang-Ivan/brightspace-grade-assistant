@@ -62,7 +62,24 @@ function createHarness(options = {}) {
     }
     editor.html = options.feedback || '';
     rubric.html = '<p>Keep this rubric feedback</p>';
-    const h = {dom, w, local, session, advance, flush, grade, editor, rubric, reloads: 0, saveClicks: 0, nextClicks: 0, previousClicks: 0};
+    const panel = editor.parentElement;
+    panel._feedbackText = editor.html;
+    const h = {dom, w, local, session, advance, flush, grade, editor, panel, rubric,
+        feedbackModel: editor.html, feedbackEdits: [], reloads: 0, saveClicks: 0, nextClicks: 0, previousClicks: 0};
+    // Native Brightspace commits editor HTML on blur only if it differs from
+    // the panel's last-notified value. Save Draft consumes the emitted model.
+    editor.addEventListener('d2l-htmleditor-blur', () => {
+        const html = editor.html;
+        if (panel._feedbackText === html) return;
+        panel._feedbackText = html;
+        panel.dispatchEvent(new w.CustomEvent('d2l-consistent-eval-feedback-edit', {
+            bubbles: true, composed: true, detail: {feedback: html, files: []}
+        }));
+    });
+    panel.addEventListener('d2l-consistent-eval-feedback-edit', event => {
+        h.feedbackModel = event.detail.feedback;
+        h.feedbackEdits.push(event.detail.feedback);
+    });
     h.setStudent = (name, id, changeUrl = false) => {
         w.document.title = 'Assignment Evaluation - ' + name + ' - Fixture Homework';
         const header = w.document.querySelector('d2l-consistent-evaluation-header');

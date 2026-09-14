@@ -4,7 +4,7 @@
 
 You install **one small file**, [`brightspace_auto_feedback_injector.user.js`](../brightspace_auto_feedback_injector.user.js), using Violentmonkey or Tampermonkey. You do not need to learn programming, download the whole project, or install Node, npm, or Git.
 
-For a quick overview, see the [project README](../README.md) or [watch the fictional-data demo](https://quang-Ivan.github.io/brightspace-grade-assistant/#demo). This guide walks through installing v1.0.5, preparing a CSV, and using the helper one student at a time.
+For a quick overview, see the [project README](../README.md) or [watch the fictional-data demo](https://quang-Ivan.github.io/brightspace-grade-assistant/#demo). This guide walks through installing v1.0.6, preparing a CSV, and using the helper one student at a time.
 
 ## Before you start: is this the right tool for your task?
 
@@ -51,7 +51,7 @@ You should now see your chosen extension in Chrome's extensions list. You can us
 2. Copy the entire file, from `// ==UserScript==` through the last line.
 3. Open your userscript manager's dashboard. In Violentmonkey, use **+ → Create a new script**; in Tampermonkey, choose **Create a new script**.
 4. Replace the editor's example text with the code you copied. Use Ctrl+A / Ctrl+V on Windows, or Command+A / Command+V on a Mac.
-5. Save in the editor. Confirm **Brightspace (D2L) CSV Grade & Feedback Auto-Filler**, version **1.0.5**, is enabled.
+5. Save in the editor. Confirm **Brightspace (D2L) CSV Grade & Feedback Auto-Filler**, version **1.0.6**, is enabled.
 6. Disable older copies, then refresh Brightspace.
 
 Neither method requires downloading the whole repository or installing developer tools.
@@ -62,7 +62,7 @@ Neither method requires downloading the whole repository or installing developer
 2. Open the course, then **Assignments**, then the assignment you intend to grade.
 3. Click one student's name or **Go to Evaluation**.
 4. Check that you can see that student's name, **Overall Grade**, and **Overall Feedback**.
-5. Refresh the page. The helper panel should show **Brightspace CSV Grade & Feedback Auto-Filler v1.0.5** and the same student's name.
+5. Refresh the page. The helper panel should show **Brightspace CSV Grade & Feedback Auto-Filler v1.0.6** and the same student's name.
 
 The class submission list is not the individual evaluation page. If the panel says **No student identified**, do not import a file or start filling there; open a student's evaluation first. Likewise, import on the evaluation page where you will work, not on the course home or Grades page.
 
