@@ -34,12 +34,12 @@ test('only empty scores mean unsubmitted; invalid nonblank or nonfinite values b
     assert.equal(rows['name:charlie'].score, '88.5');
 });
 
-test('CSV grade columns and maxima must be unambiguous', t => {
+test('CSV grade columns must be unambiguous and bonus points may exceed MaxPoints', t => {
     const h = fixture(t);
     assert.throws(() => h.api.parseGradebookCSV('student,score,grade\nAlice,8,9'), /exactly one/);
     assert.throws(() => h.api.parseGradebookCSV('student,Score,score\nAlice,8,9'), /Duplicate CSV/);
     assert.throws(() => h.api.parseGradebookCSV('student,score,reason,Feedback\nAlice,8,One,Other'), /unambiguous feedback/);
-    assert.throws(() => h.api.parseGradebookCSV('student,Homework 1 Points Grade <Numeric MaxPoints:8>\nAlice,9'), /maximum/);
+    assert.equal(h.api.parseGradebookCSV('student,Homework 1 Points Grade <Numeric MaxPoints:6>\nAlice,6.5')['name:alice'].score, '6.5');
     assert.equal(h.api.parseGradebookCSV('OrgDefinedId,Homework 1 Points Grade <Numeric MaxPoints:8>\n#001,8')['id:001'].score, '8');
 });
 
@@ -514,12 +514,31 @@ test('storage failure prevents save click; reset preserves unrelated scopes and 
     assert.equal(Object.keys(h.api.getStudentDatabase()).length, 0);
 });
 
-test('score maximum is checked before either field is changed; score-only fill needs no feedback editor', async t => {
-    const h = fixture(t); h.importCSV(CSV);
-    h.grade.setAttribute('max', '8');
+test('bonus points fill above both host and input maxima without clamping', async t => {
+    const h = fixture(t); h.importCSV('student,OrgDefinedId,score,reason\nAlice Smith,001,7,Base 6/6 plus bonus 1.');
+    h.grade.setAttribute('max', '6');
+    h.grade.shadowRoot.querySelector('input').setAttribute('max', '6');
     await h.api.manualAction('fill');
-    assert.equal(h.grade.value, ''); assert.equal(h.editor.html, '');
-    h.grade.setAttribute('max', '100');
+    assert.equal(h.grade.value, '7');
+    assert.match(h.editor.html, /Base 6\/6 plus bonus 1/);
+    assert.equal(h.grade.getAttribute('max'), '6');
+    assert.equal(h.grade.shadowRoot.querySelector('input').getAttribute('max'), '6');
+    assert.equal(h.saveClicks, 0);
+    assert.equal(h.api.readbackMatches({score: '7', reason: 'Base 6/6 plus bonus 1.', checkFeedback: true}), true);
+});
+
+test('invalid scores are rejected before either field changes', async t => {
+    const h = fixture(t);
+    for (const score of ['-1', 'NaN', 'Infinity', '7abc', '9'.repeat(400)]) {
+        h.api.saveStudentDatabase({'id:001': {name: 'Alice Smith', orgId: '001', score, submitted: true, reason: 'Do not fill'}});
+        await h.api.manualAction('fill');
+        assert.equal(h.grade.value, ''); assert.equal(h.editor.html, '');
+        assert.equal(h.saveClicks, 0); assert.match(h.status(), /Invalid score/);
+    }
+});
+
+test('score-only fill needs no feedback editor', async t => {
+    const h = fixture(t);
     h.importCSV('student,OrgDefinedId,score\nAlice Smith,001,95');
     h.editor.parentElement.remove();
     await h.api.manualAction('fill');

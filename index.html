@@ -35,7 +35,7 @@
     },
     "description": "A free userscript for teaching assistants to fill reviewed assignment grades and personalized feedback from CSV into Brightspace.",
     "url": "https://quang-Ivan.github.io/brightspace-grade-assistant/",
-    "softwareVersion": "1.0.7",
+    "softwareVersion": "1.0.8",
     "license": "https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/LICENSE",
     "author": {
       "@type": "Person",
@@ -283,7 +283,7 @@
   <header>
     <div class="container">
       <div class="badge-bar" style="margin-bottom:16px;">
-        <span class="badge">🚀 v1.0.7</span>
+        <span class="badge">🚀 v1.0.8</span>
         <span class="badge">🔒 No Tracking or Third-Party Uploads</span>
         <span class="badge">⚖️ MIT Open Source</span>
       </div>
@@ -311,7 +311,7 @@
         </a>
       </div>
       <p class="install-status">New to userscripts? Follow the <a href="#install">installation steps below</a>.</p>
-      <p class="install-status"><strong>New in v1.0.7:</strong> Move or minimize the panel without losing its title bar. Short windows scroll the panel contents; position and the minimized preference survive refreshes.</p>
+      <p class="install-status"><strong>New in v1.0.8:</strong> Bonus scores can exceed the assignment's nominal maximum, such as 7 points on a 6-point assignment. CSV import and field filling preserve the full score.</p>
     </div>
   </header>
 
@@ -573,10 +573,10 @@
       </div>
       <div class="faq-item">
         <div class="faq-question">How can I stop the helper panel from covering page content?</div>
-        <div class="faq-answer">Click <strong>–</strong> or press <code>Alt + M</code> to minimize it, and click <strong>+</strong> to expand it. Drag the blue title bar to move it. In short windows, scroll inside the panel to reach its remaining controls. If the title is off screen in an older version, update to v1.0.7 and refresh when your current work can safely reload.</div>
+        <div class="faq-answer">Click <strong>–</strong> or press <code>Alt + M</code> to minimize it, and click <strong>+</strong> to expand it. Drag the blue title bar to move it. In short windows, scroll inside the panel to reach its remaining controls. If the title is off screen in an older version, update to v1.0.8 and refresh when your current work can safely reload.</div>
       </div>
       <p style="margin-top:24px; color:var(--text-muted); font-size:14px;">
-        <strong>Testing:</strong> v1.0.7 fixes unreachable panel controls in short windows. Chrome checks cover narrow windows, dragging to screen edges, minimizing, and position restoration after refresh; the installed version was also checked on a real Brightspace homepage. Syntax and all 47 regression tests pass. The prior feedback-notification fix is retained. The Save Draft and refresh workflow has simulation coverage; a real save with v1.0.7 remains unverified. The video shows v1.0.5 field filling.
+        <strong>Testing:</strong> v1.0.8 allows bonus scores above the nominal maximum. Syntax and all 49 regression tests pass, including CSV import and filling 7 points with a maximum of 6. A fresh Brightspace homepage loaded the installed v1.0.8 script. The prior panel and feedback-notification fixes are retained. The Save Draft and refresh workflow has simulation coverage; live saving of an over-maximum score remains unverified. The video shows v1.0.5 field filling.
         <a href="https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/LOCAL_VALIDATION.md">See the testing details</a>.
       </p>
     </div>

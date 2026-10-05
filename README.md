@@ -1,7 +1,7 @@
 # 🎓 Brightspace (D2L) CSV Grade & Feedback Auto-Filler
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.0.7-brightgreen.svg)](brightspace_auto_feedback_injector.user.js)
+[![Version](https://img.shields.io/badge/Version-1.0.8-brightgreen.svg)](brightspace_auto_feedback_injector.user.js)
 [![Userscript](https://img.shields.io/badge/Userscript-Violentmonkey%20%7C%20Tampermonkey-green.svg)](brightspace_auto_feedback_injector.user.js)
 [![Privacy: No Tracking](https://img.shields.io/badge/Privacy-No%20Tracking-brightgreen.svg)](#-privacy--local-execution)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-orange.svg)](CONTRIBUTING.md)
@@ -42,7 +42,7 @@ Install one browser extension to run userscripts:
 
 Open the [**Greasy Fork listing**](https://greasyfork.org/en/scripts/595051-brightspace-d2l-csv-grade-feedback-auto-filler), click **Install this script**, then confirm **Install** in your extension. Your userscript manager can check Greasy Fork for future updates.
 
-Alternatively, use the [v1.0.7 source file](brightspace_auto_feedback_injector.user.js) and the [manual installation steps](docs/USER_GUIDE.md#2-install-this-script). Keep only one copy of the helper enabled.
+Alternatively, use the [v1.0.8 source file](brightspace_auto_feedback_injector.user.js) and the [manual installation steps](docs/USER_GUIDE.md#2-install-this-script). Keep only one copy of the helper enabled.
 
 ### Step 3: Grade in Brightspace!
 
@@ -123,6 +123,7 @@ student,score,reason
 
 - **`student`**: Full name matching Brightspace (e.g. `First Last` or `Last, First`).
 - **`score`**: Numeric points for your assignment, not a percentage or a fraction such as `7/8`. The examples above are out of 100. **For unsubmitted students, leave the score blank; use `0` for an actual zero.**
+- Bonus points may exceed the nominal maximum (for example, `7` on an assignment worth `6`). The helper preserves that score without clamping it, including when a Format B header contains `MaxPoints:6`.
 - **`reason`**: Plaintext feedback, with CSV quoting for commas, quotes, or line breaks. Blank feedback leaves existing comments unchanged.
 
 > In v1.0.5, a wholly name-only CSV can match a unique displayed name even when the page exposes a school ID. A CSV that supplies IDs still pauses on an actual ID conflict. Prefer official IDs when available.
@@ -258,7 +259,7 @@ Your CSV, progress, and the **Outside CSV** count are stored under the school's 
 
 ## ✅ Testing & Current Scope
 
-v1.0.7 fixes a floating panel that could extend above the window and make its move/minimize controls unreachable. Chrome checks cover short and narrow windows, dragging to viewport edges, minimizing, and restoring position after refresh. The installed script was also checked on a real Brightspace homepage. Syntax and all 47 production-core regression tests pass. The prior v1.0.6 feedback-notification repair is retained; the complete **Save Draft → refresh → verify** path has simulation coverage, while a real save with v1.0.7 remains unverified. See the [test results](docs/LOCAL_VALIDATION.md) for details. The demo records v1.0.5 field filling only.
+v1.0.8 permits bonus scores above the nominal maximum in CSV import and field filling. Syntax and all 49 production-core regression tests pass, and a fresh Brightspace homepage loaded the installed v1.0.8 script. The v1.0.7 panel repair and v1.0.6 feedback-notification repair are retained. The complete **Save Draft → refresh → verify** path has simulation coverage; live saving of an over-maximum score remains unverified. See the [test results](docs/LOCAL_VALIDATION.md) for details. The demo records v1.0.5 field filling only.
 
 ---
 

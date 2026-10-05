@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Brightspace (D2L) CSV Grade & Feedback Auto-Filler
 // @namespace    https://github.com/quang-Ivan/brightspace-grade-assistant
-// @version      1.0.7
+// @version      1.0.8
 // @description  A time-saving tool for TAs: fill Brightspace assignment grades and personalized feedback from CSV. Free, open-source, and no third-party uploads.
 // @author       quang-Ivan
 // @license      MIT
@@ -348,21 +348,15 @@
         return !expected.checkFeedback || normalizeFeedback(feedbackText(feedbackControl())) === normalizeFeedback(expected.reason);
     }
 
-    function assertScoreFits(control, score) {
+    function assertValidScore(score) {
         const number = Number(score);
         if (!/^\d+(\.\d+)?$/.test(String(score)) || !Number.isFinite(number) || number < 0) throw new Error('Invalid score.');
-        const input = control.tagName === 'INPUT' ? control : deepQuery('input', control)[0];
-        for (const el of [control, input].filter(Boolean)) {
-            const max = el.getAttribute('max');
-            if (max !== null && max !== '' && Number.isFinite(Number(max)) && number > Number(max)) {
-                throw new Error('Score exceeds the current Overall Grade maximum.');
-            }
-        }
+        // Bonus points may exceed the nominal assignment maximum.
     }
 
     function deepFillScore(score, op, target, control = overallGradeControl()) {
         if (!guardTarget(op, target)) return false;
-        assertScoreFits(control, score);
+        assertValidScore(score);
         control.value = Number(score);
         for (const input of deepQuery('input', control)) {
             if (!guardTarget(op, target)) return false;
@@ -566,7 +560,7 @@
         // Resolve every requested control before changing either one.
         const grade = overallGradeControl();
         const feedback = expected.checkFeedback ? feedbackControl() : null;
-        assertScoreFits(grade, expected.score);
+        assertValidScore(expected.score);
         // The native editor may clear isDirty during its change event. Remember our own writes.
         locallyEditedTarget = target;
         if (!deepFillScore(expected.score, op, target, grade)) throw new Error('Overall Grade did not accept the value.');
@@ -918,9 +912,6 @@
             ['score', 'grade', 'points', 'mark'].includes(header) || /^.+ points grade <numeric maxpoints:\d+(\.\d+)?>$/.test(header));
         if (grades.length !== 1) throw new Error('CSV needs exactly one unambiguous score/grade column. Export only the target grade item.');
         const scoreIndex = grades[0].i;
-        const maxMatch = grades[0].header.match(/<numeric maxpoints:(\d+(?:\.\d+)?)>/);
-        const max = maxMatch ? Number(maxMatch[1]) : null;
-        if (max !== null && !Number.isFinite(max)) throw new Error('Invalid grade-item maximum.');
         if (nameIndex < 0 && (firstIndex < 0 || lastIndex < 0) && idIndex < 0) throw new Error('CSV needs student names or OrgDefinedId.');
         const db = Object.create(null);
         for (let i = 1; i < rows.length; i++) {
@@ -938,7 +929,6 @@
             if (submitted && (!/^\d+(\.\d+)?$/.test(rawScore) || !Number.isFinite(Number(rawScore)))) {
                 throw new Error('Invalid nonblank score on row ' + (i + 1) + '. Only an empty score means unsubmitted.');
             }
-            if (submitted && max !== null && Number(rawScore) > max) throw new Error('Score exceeds the CSV grade-item maximum on row ' + (i + 1) + '.');
             db[key] = {name, orgId, score: submitted ? rawScore : null, submitted,
                 reason: reasonIndex >= 0 ? row[reasonIndex].trim() : ''};
         }
@@ -994,7 +984,7 @@
             maxWidth: 'calc(100vw - 16px)', maxHeight: 'calc(100dvh - 16px)', overflow: 'hidden'});
         Object.assign(hdr.style, {flexShrink: '0', gap: '8px', userSelect: 'none', touchAction: 'none'});
         const title = hdr.querySelector('span');
-        title.textContent = '🎓 Grading Assistant v1.0.7';
+        title.textContent = '🎓 Grading Assistant v1.0.8';
         title.title = 'Brightspace CSV Grade & Feedback Auto-Filler — drag to move';
         Object.assign(title.style, {minWidth: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'});
         Object.assign(minBtn.style, {flexShrink: '0', width: '28px', height: '28px', padding: '0'});
@@ -1092,7 +1082,7 @@
 
             panel.innerHTML = `
                 <div id="bs-panel-hdr" style="background:#006fbf; color:#fff; padding:10px 14px; font-weight:bold; cursor:move; display:flex; justify-content:space-between; align-items:center; border-radius:6px 6px 0 0;">
-                    <span>🎓 Grading Assistant v1.0.7</span>
+                    <span>🎓 Grading Assistant v1.0.8</span>
                     <button id="bs-panel-min" style="background:none; border:none; color:#fff; font-size:16px; cursor:pointer; font-weight:bold;">–</button>
                 </div>
                 <div id="bs-panel-bdy" style="padding:14px;">

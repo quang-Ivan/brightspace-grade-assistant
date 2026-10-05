@@ -24,6 +24,7 @@ Keep only one copy of this helper enabled. For scripts installed from this page,
 
 - Drag the blue title bar to move the panel; use **– / +** or **Alt+M** to minimize or expand it. Its title stays on screen, contents scroll in short windows, and position and the minimized preference survive refreshes. Pages without an identified assignment start minimized.
 - Enter Overall Grade and Overall Feedback together, including multiline written comments.
+- Allow bonus scores above the nominal assignment maximum, such as 7 points on a 6-point assignment, without clamping them.
 - Skip existing evaluations when the grade and supplied feedback already match.
 - Rewind to the beginning of the current student list or continue from where you are.
 - Track verified drafts, existing matches, explicitly unsubmitted rows, **Outside CSV** pages, and rows still remaining.
@@ -65,7 +66,7 @@ Imported rows, progress, and the current CSV revision's **Outside CSV** count st
 - [Source code and documentation](https://github.com/quang-Ivan/brightspace-grade-assistant)
 - [Testing details](https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/LOCAL_VALIDATION.md)
 
-Designed for the English-language Consistent Evaluation interface. v1.0.7 fixes a panel that could extend above the window and hide its move/minimize controls. Chrome checks cover short and narrow windows, dragging to viewport edges, minimizing, and restoring position after refresh. The installed version was also checked on a real Brightspace homepage. Syntax and all 47 regression tests pass. The prior v1.0.6 feedback-notification repair is retained; the complete Save Draft and refresh path has simulation coverage, while a real save with v1.0.7 remains unverified. See [the local validation notes](https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/LOCAL_VALIDATION.md) for details. The video records v1.0.5 field filling.
+Designed for the English-language Consistent Evaluation interface. v1.0.8 permits bonus scores above the nominal maximum in CSV import and field filling. Syntax and all 49 regression tests pass, including filling 7 with a maximum of 6. A fresh Brightspace homepage loaded the installed v1.0.8 script. The v1.0.7 panel repair and v1.0.6 feedback-notification repair are retained. The complete Save Draft and refresh path has simulation coverage; live saving of an over-maximum score remains unverified. See [the local validation notes](https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/LOCAL_VALIDATION.md) for details. The video records v1.0.5 field filling.
 
 ## ❓ Can I bulk enter assignment feedback as a TA?
 

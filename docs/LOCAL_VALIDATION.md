@@ -1,5 +1,13 @@
 # Testing & Current Scope
 
+## v1.0.8 bonus points — 2026-10-05
+
+The helper previously rejected scores above the nominal maximum in both the CSV importer and the Overall Grade fill preflight. v1.0.8 accepts those bonus scores without clamping them or changing the native control's maximum. Finite, nonnegative numeric scores remain required; identity, feedback, save acknowledgment and reload verification checks are unchanged.
+
+Syntax and all **49** production-core regression tests passed. The tests cover a CSV score of 6.5 with `MaxPoints:6`, filling 7 with both the native host and inner input set to `max="6"`, exact feedback/readback, and rejecting invalid scores before either field changes. All 37 rows of the current local assignment CSV also filled their exact scores and feedback in the isolated DOM fixture at max 6, including 11 bonus scores above 6, with zero save clicks. Private CSV data is outside this repository.
+
+Chrome's installed Tampermonkey script was updated to v1.0.8. A fresh, signed-in Brightspace homepage displayed **Grading Assistant v1.0.8**. No live grade fields were filled or saved during this repair; over-maximum live Save Draft acceptance remains unverified.
+
 ## v1.0.7 floating panel repair — 2026-10-05
 
 The previous panel was fixed to the bottom-right corner without a height limit. When its content exceeded the viewport height, its title, drag handle and minimize button extended above the visible page. Dragging also had no viewport boundaries.
