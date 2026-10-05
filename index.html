@@ -416,7 +416,7 @@
           <div class="step-content">
             <h4>Open Brightspace & Start Cruising</h4>
             <p>
-              Open one student's assignment evaluation, not the class list. Use <strong>📁 Load Scores & Feedback CSV</strong> and check the preview. Verify one unpublished submission with <strong>Fill Current → Save Draft</strong> before starting <strong>🚀 Auto-Cruise</strong> (or <code>Alt + A</code>).
+              Open one student's assignment evaluation, not the class list. If the helper is minimized, click <strong>+</strong> to expand it. Use <strong>📁 Load Scores & Feedback CSV</strong> and check the preview. Verify one unpublished submission with <strong>Fill Current → Save Draft</strong> before starting <strong>🚀 Auto-Cruise</strong> (or <code>Alt + A</code>).
             </p>
           </div>
         </div>
@@ -492,6 +492,11 @@
         </thead>
         <tbody>
           <tr>
+            <td><code>Alt + M</code></td>
+            <td><strong>Minimize or Expand Panel</strong></td>
+            <td>Toggle the compact title bar; drag the blue title bar to move the panel</td>
+          </tr>
+          <tr>
             <td><code>Alt + A</code></td>
             <td><strong>Toggle Auto-Cruise</strong></td>
             <td>Starts continuous automated grading or pauses execution</td>
@@ -565,6 +570,10 @@
       <div class="faq-item">
         <div class="faq-question">What happens to already-published evaluations?</div>
         <div class="faq-answer">With fast skip enabled, matching grades and feedback are skipped. A mismatch pauses the helper; it does not click Update. An unsaved fill is not treated as an existing match.</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-question">How can I stop the helper panel from covering page content?</div>
+        <div class="faq-answer">Click <strong>–</strong> or press <code>Alt + M</code> to minimize it, and click <strong>+</strong> to expand it. Drag the blue title bar to move it. In short windows, scroll inside the panel to reach its remaining controls. If the title is off screen in an older version, update to v1.0.7 and refresh when your current work can safely reload.</div>
       </div>
       <p style="margin-top:24px; color:var(--text-muted); font-size:14px;">
         <strong>Testing:</strong> v1.0.7 fixes unreachable panel controls in short windows. Chrome checks cover narrow windows, dragging to screen edges, minimizing, and position restoration after refresh; the installed version was also checked on a real Brightspace homepage. Syntax and all 47 regression tests pass. The prior feedback-notification fix is retained. The Save Draft and refresh workflow has simulation coverage; a real save with v1.0.7 remains unverified. The video shows v1.0.5 field filling.
