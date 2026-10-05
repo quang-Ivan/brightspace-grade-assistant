@@ -51,7 +51,7 @@ function loadRoster() {
 
 const roster = loadRoster();
 const byId = new Map(roster.map(student => [student.OrgDefinedId, student]));
-const state = {saveCalls: 0, drafts: new Map(), results: []};
+const state = {saveCalls: 0, updateCalls: 0, drafts: new Map(), results: []};
 
 function json(res, status, value) {
     const body = JSON.stringify(value);
@@ -69,6 +69,7 @@ function publicState() {
     return {
         localSimulation: true,
         saveCalls: state.saveCalls,
+        updateCalls: state.updateCalls,
         persistentDrafts,
         draftCount: state.drafts.size,
         results: state.results,
@@ -101,6 +102,7 @@ function handleSave(req, res, url) {
     bodyJson(req).then(body => {
         const id = String(body.OrgDefinedId || body.orgDefinedId || body.student || '').trim().replace(/^#/, '');
         const mode = String(body.mode || url.searchParams.get('mode') || 'default');
+        const saveAction = body.saveAction === 'update' ? 'update' : 'draft';
         if (!byId.has(id)) return json(res, 400, {ok: false, error: 'Unknown synthetic OrgDefinedId.'});
         const draft = {
             OrgDefinedId: id,
@@ -110,11 +112,12 @@ function handleSave(req, res, url) {
             savedAt: new Date().toISOString()
         };
         state.saveCalls++;
-        const result = {call: state.saveCalls, OrgDefinedId: id, mode, score: draft.score,
+        if (saveAction === 'update') state.updateCalls++;
+        const result = {call: state.saveCalls, OrgDefinedId: id, mode, saveAction, score: draft.score,
             feedbackHtml: draft.feedbackHtml, acknowledged: false, persisted: false};
         state.results.push(result);
         const finish = () => {
-            if (mode === 'reject-save' || mode === 'no-ack' || mode === 'published') {
+            if (mode === 'reject-save' || mode === 'no-ack' || (mode === 'published' && saveAction !== 'update')) {
                 if (mode === 'reject-save') return json(res, 409, {ok: false, acknowledged: false, error: 'Fixture rejected this save.'});
                 if (mode === 'published') return json(res, 405, {ok: false, acknowledged: false, error: 'Published evaluation exposes Update only.'});
                 return json(res, 200, {ok: true, acknowledged: false, persisted: false});

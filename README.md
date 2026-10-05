@@ -1,7 +1,7 @@
 # 🎓 Brightspace (D2L) CSV Grade & Feedback Auto-Filler
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.0.8-brightgreen.svg)](brightspace_auto_feedback_injector.user.js)
+[![Version](https://img.shields.io/badge/Version-1.0.9-brightgreen.svg)](brightspace_auto_feedback_injector.user.js)
 [![Userscript](https://img.shields.io/badge/Userscript-Violentmonkey%20%7C%20Tampermonkey-green.svg)](brightspace_auto_feedback_injector.user.js)
 [![Privacy: No Tracking](https://img.shields.io/badge/Privacy-No%20Tracking-brightgreen.svg)](#-privacy--local-execution)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-orange.svg)](CONTRIBUTING.md)
@@ -42,7 +42,7 @@ Install one browser extension to run userscripts:
 
 Open the [**Greasy Fork listing**](https://greasyfork.org/en/scripts/595051-brightspace-d2l-csv-grade-feedback-auto-filler), click **Install this script**, then confirm **Install** in your extension. Your userscript manager can check Greasy Fork for future updates.
 
-Alternatively, use the [v1.0.8 source file](brightspace_auto_feedback_injector.user.js) and the [manual installation steps](docs/USER_GUIDE.md#2-install-this-script). Keep only one copy of the helper enabled.
+Alternatively, use the [v1.0.9 source file](brightspace_auto_feedback_injector.user.js) and the [manual installation steps](docs/USER_GUIDE.md#2-install-this-script). Keep only one copy of the helper enabled.
 
 ### Step 3: Grade in Brightspace!
 
@@ -69,7 +69,7 @@ The helper enters grades through the **assignment evaluation page**, not the Gra
 - For unreleased assignments, the script **strictly targets "Save Draft"** (it **never** clicks "Publish" on drafts).
 - After Brightspace confirms a draft save, the helper refreshes and checks the same student's score and feedback before moving on.
 - Once you finish reviewing, publish separately through Brightspace's own controls and check the intended student view.
-- For an already-published evaluation, the helper can **skip matching values**. If the grade or supplied feedback differs, it pauses; it never clicks **Update**.
+- For an already-published evaluation, Auto-Cruise can **skip matching values** and pauses on differences. Use **Overwrite Published (Current Student)** to confirm and update just that student from the CSV, then verify the result after refresh.
 
 ### 3. CSV rows, roster pages, and identity outcomes
 
@@ -87,6 +87,7 @@ The helper enters grades through the **assignment evaluation page**, not the Gra
 
 - 🪟 **Move or Minimize the Panel**: The title bar stays on screen, and panel contents scroll in short windows. Drag the title bar to move it; use **– / +** or **Alt+M** to toggle it. Position and the minimized preference survive refreshes. Pages without an identified assignment start minimized.
 - 🔄 **Class Traversal & Progress**: Optionally rewinds to the first student, then moves through a bounded Brightspace roster while tracking your imported rows. Partial CSVs are supported; roster pages with no matching CSV identity are tracked as **Outside CSV** rather than graded or counted as unsubmitted.
+- ✍️ **Manual Published Overwrite**: Confirm and update only the current student from the CSV, then refresh to verify. Updated evaluations are counted separately from drafts.
 - 🎯 **Focused Form Filling**: Fills only Overall Grade and Overall Feedback, leaving individual rubric scores and unrelated editors alone.
 - 📝 **Written Feedback with Line Breaks**: Copies ordinary text from your CSV, including multiline comments. No HTML formatting is required.
 - ⚡ **Fast Skip for Existing Matches**: Skips published or previously verified evaluations when the score and any supplied feedback match. Dialogs pause the run for your review.
@@ -221,7 +222,7 @@ Prepare a CSV with student names or IDs, one score column, and a <code>reason</c
 
 <details>
 <summary><strong>Q: Can TAs bulk enter assignment feedback in D2L?</strong></summary>
-Yes, if your TA account has permission to evaluate that assignment and the page uses supported controls. Each CSV row can contain its own comment. Use manual controls for a few students or Auto-Cruise for your reviewed rows; the helper does not grant extra permissions or publish results.
+Yes, if your TA account has permission to evaluate that assignment and the page uses supported controls. Each CSV row can contain its own comment. Use manual controls for a few students or Auto-Cruise for your reviewed rows; the helper does not grant extra permissions. Auto-Cruise saves drafts; the separate manual overwrite control updates an already-published evaluation after confirmation.
 </details>
 
 <details>
@@ -248,7 +249,7 @@ A completely empty line is ignored because it identifies no student. If the curr
 
 <details>
 <summary><strong>Q: What if the evaluation is already published?</strong></summary>
-The helper never clicks Update. With fast skip enabled, matching grade and feedback are skipped; a mismatch pauses for your review. A just-filled entry is not treated as an existing saved match.
+Auto-Cruise skips matching grade and feedback and pauses on a mismatch. To apply a reviewed change, click **Overwrite Published (Current Student)** and confirm the displayed student and target score. It fills the CSV values, clicks Update, and verifies after refresh; Auto-Cruise stays paused. A just-filled entry is not treated as an existing saved match.
 </details>
 
 ## 🔒 Privacy & Local Execution
@@ -259,7 +260,7 @@ Your CSV, progress, and the **Outside CSV** count are stored under the school's 
 
 ## ✅ Testing & Current Scope
 
-v1.0.8 permits bonus scores above the nominal maximum in CSV import and field filling. Syntax and all 49 production-core regression tests pass, and a fresh Brightspace homepage loaded the installed v1.0.8 script. The v1.0.7 panel repair and v1.0.6 feedback-notification repair are retained. The complete **Save Draft → refresh → verify** path has simulation coverage; live saving of an over-maximum score remains unverified. See the [test results](docs/LOCAL_VALIDATION.md) for details. The demo records v1.0.5 field filling only.
+v1.0.9 adds **Overwrite Published (Current Student)**: confirm the student and score, fill the CSV values, click the native Update control once, then reload and verify the same student. Auto-Cruise still pauses on published mismatches. Bonus scores above the nominal maximum remain supported. Syntax and all **55** production-core regression tests pass. Chrome simulation verified a confirmed Update, server-stored score and multiline feedback, reload readback, and no automatic advancement. This is simulation evidence; live v1.0.9 Update acceptance remains unverified. The video records v1.0.5 field filling. See the [test results](docs/LOCAL_VALIDATION.md).
 
 ---
 

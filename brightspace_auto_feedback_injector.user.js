@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Brightspace (D2L) CSV Grade & Feedback Auto-Filler
 // @namespace    https://github.com/quang-Ivan/brightspace-grade-assistant
-// @version      1.0.8
+// @version      1.0.9
 // @description  A time-saving tool for TAs: fill Brightspace assignment grades and personalized feedback from CSV. Free, open-source, and no third-party uploads.
 // @author       quang-Ivan
 // @license      MIT
@@ -516,16 +516,25 @@
         assertNoDialog();
         const all = buttons();
         if (all.some(button => buttonLabel(button) === 'update')) {
-            throw new Error('An Update action is present. Published evaluations are not modified.');
+            throw new Error('An Update action is present. Auto-Cruise does not modify published evaluations. Review the preview and use Overwrite Published for this student.');
         }
         const matches = all.filter(button => buttonLabel(button) === 'save draft');
         if (matches.length !== 1 || isDisabled(matches[0])) throw new Error('One enabled Save Draft button is required.');
         return matches[0];
     }
 
-    function triggerSave(op, target) {
+    function evaluationSaveButton(op, saveAction) {
+        if (saveAction !== 'update') return saveDraftButton();
+        if (op.mode !== 'manual') throw new Error('Published updates require a manual action for this student.');
+        assertNoDialog();
+        const matches = buttons().filter(button => buttonLabel(button) === 'update');
+        if (matches.length !== 1 || isDisabled(matches[0])) throw new Error('One enabled Update button is required for an already-published evaluation.');
+        return matches[0];
+    }
+
+    function triggerSave(op, target, saveAction) {
         if (!guardTarget(op, target)) return false;
-        const button = saveDraftButton();
+        const button = evaluationSaveButton(op, saveAction);
         if (!guardTarget(op, target)) return false;
         button.click();
         return true; // Clicked only: never interpreted as a completed save.
@@ -536,15 +545,17 @@
             .map(node => ({node, text: normalizeFeedback((node.textContent || '') + ' ' + (node.shadowRoot?.textContent || '')).toLowerCase()}));
     }
 
-    async function waitForSaveAcknowledgement(op, target, previous) {
+    async function waitForSaveAcknowledgement(op, target, previous, saveAction) {
         for (let i = 0; i < 60; i++) {
             if (!guardTarget(op, target)) return false;
             assertNoDialog();
             for (const {node, text} of nativeSignals()) {
                 if (/\b(error|failed|unable|invalid|could not|cannot)\b/.test(text)) throw new Error('Brightspace reports: ' + text);
                 const fresh = !previous.has(node) || previous.get(node) !== text;
-                const success = /\b(draft saved|saved as draft|evaluation saved|feedback saved|changes saved|saved successfully)\b/.test(text);
-                if (fresh && success && !/\b(not|unsaved|fail|error|publish)\b/.test(text)) return true;
+                const success = /\b(draft saved|saved as draft|evaluation saved|feedback saved|changes saved|saved successfully)\b/.test(text) ||
+                    (saveAction === 'update' && /\b(evaluation updated|feedback updated|changes updated|updated successfully|evaluation published|feedback published)\b/.test(text));
+                if (fresh && success && !/\b(not|unsaved|fail|error)\b/.test(text) &&
+                    (saveAction === 'update' || !/\b(publish|published)\b/.test(text))) return true;
             }
             if (!await delay(200, op)) return false;
         }
@@ -568,20 +579,20 @@
         return guardTarget(op, target) && readbackMatches(expected);
     }
 
-    async function saveAndVerify(op, target, expected) {
+    async function saveAndVerify(op, target, expected, saveAction = 'draft') {
         if (!guardTarget(op, target)) return false;
         if (!readbackMatches(expected)) throw new Error('Values changed before saving. Paused.');
-        saveDraftButton(); // Preflight before creating recovery state or clicking.
+        evaluationSaveButton(op, saveAction); // Preflight before creating recovery state or clicking.
         // Test storage before sending a save; readback cannot safely resume without it.
         const pending = {schemaVersion: SCHEMA_VERSION, stage: 'waiting_ack', pageInstance: PAGE_INSTANCE,
-            createdAt: Date.now(), ctx: op.ctx, revision: op.revision, mode: op.mode,
+            createdAt: Date.now(), ctx: op.ctx, revision: op.revision, mode: op.mode, saveAction,
             wraps: op.wraps, hops: op.hops,
             target: {ctx: target.ctx, url: target.url, name: target.name, orgId: target.orgId, key: target.key}, expected};
         sessionStorage.setItem(PENDING_KEY, JSON.stringify(pending));
         const previous = new Map(nativeSignals().map(signal => [signal.node, signal.text]));
-        if (!triggerSave(op, target)) return false;
-        setStatus('Save Draft requested. Waiting for native confirmation...', '#006fbf');
-        if (!await waitForSaveAcknowledgement(op, target, previous) || !guardTarget(op, target)) return false;
+        if (!triggerSave(op, target, saveAction)) return false;
+        setStatus((saveAction === 'update' ? 'Update' : 'Save Draft') + ' requested. Waiting for native confirmation...', '#006fbf');
+        if (!await waitForSaveAcknowledgement(op, target, previous, saveAction) || !guardTarget(op, target)) return false;
         if (!readbackMatches(expected)) throw new Error('Values changed during saving. Completion was not recorded.');
         pending.stage = 'readback';
         pending.createdAt = Date.now();
@@ -660,22 +671,23 @@
         const entries = Object.entries(getStudentDatabase());
         const records = getProcessedMap();
         const verified = entries.filter(([key, data]) => data.submitted !== false && completedRecord(key, data) && records[key].state === 'verified').length;
+        const updated = entries.filter(([key, data]) => data.submitted !== false && completedRecord(key, data) && records[key].state === 'verified' && records[key].saveAction === 'update').length;
         const matched = entries.filter(([key, data]) => data.submitted !== false && completedRecord(key, data) && records[key].state === 'matched').length;
         const skipped = entries.filter(([key, data]) => data.submitted === false && completedRecord(key, data)).length;
         const submitted = entries.filter(([, data]) => data.submitted !== false).length;
         const outsideCsv = Object.keys(getProgressState().outsideCsv || {}).length;
-        return {total: entries.length, submitted, verified, matched, skipped, outsideCsv,
+        return {total: entries.length, submitted, verified: verified - updated, updated, matched, skipped, outsideCsv,
             remaining: entries.filter(([key, data]) => !completedRecord(key, data)).map(([, data]) => data.name)};
     }
 
     function updateProgress() {
         const progress = progressSummary();
-        const count = progress.verified + progress.matched + progress.skipped;
+        const count = progress.verified + progress.updated + progress.matched + progress.skipped;
         const percent = progress.total ? Math.round(count / progress.total * 100) : 0;
         const text = document.getElementById('bs-progress-text');
         const bar = document.getElementById('bs-progress-bar');
         const badge = document.getElementById('bs-missing-badge');
-        if (text) text.textContent = 'Drafts verified: ' + progress.verified + '; existing matched: ' + progress.matched + '; unsubmitted: ' + progress.skipped + '; outside CSV: ' + progress.outsideCsv;
+        if (text) text.textContent = 'Drafts verified: ' + progress.verified + '; updates verified: ' + progress.updated + '; existing matched: ' + progress.matched + '; unsubmitted: ' + progress.skipped + '; outside CSV: ' + progress.outsideCsv;
         if (bar) bar.style.width = percent + '%';
         if (badge) {
             badge.textContent = progress.total ? progress.remaining.length + ' CSV row(s) remaining' : 'Import a CSV for this assignment.';
@@ -748,7 +760,7 @@
                     const progress = progressSummary();
                     if (!progress.remaining.length && progress.total) {
                         playSuccessChime();
-                        finishOperation(op, 'CSV complete: ' + progress.verified + ' reload-verified drafts; ' + progress.matched + ' existing evaluations matched; ' + progress.skipped + ' explicitly unsubmitted; ' + progress.outsideCsv + ' outside CSV skipped.');
+                        finishOperation(op, 'CSV complete: ' + progress.verified + ' reload-verified drafts; ' + progress.updated + ' verified published updates; ' + progress.matched + ' existing evaluations matched; ' + progress.skipped + ' explicitly unsubmitted; ' + progress.outsideCsv + ' outside CSV skipped.');
                         return;
                     }
                     if (!getAutoRewindPref() || op.wraps >= 2) throw new Error('CSV rows remain unverified: ' + progress.remaining.slice(0, 5).join(', '));
@@ -794,13 +806,29 @@
                 expected = {score: String(score), reason: feedbackText(feedbackControl()), checkFeedback: true};
             } else {
                 if (action === 'fill-save') saveDraftButton();
+                if (action === 'overwrite') {
+                    evaluationSaveButton(op, 'update');
+                    if (!target.data || target.data.submitted === false || target.data.score === null) throw new Error('This CSV row is explicitly unsubmitted; no published evaluation is overwritten.');
+                    assertValidScore(target.data.score);
+                    const currentScore = scoreValue(overallGradeControl());
+                    const feedbackNote = target.data.reason?.trim() ? 'Replace Overall Feedback with the CSV feedback.' : 'Keep existing Overall Feedback (CSV feedback is blank).';
+                    if (!confirm('Overwrite the published evaluation for ' + (target.data.name || target.name) +
+                        (target.orgId ? ' (OrgDefinedId: ' + target.orgId + ')' : '') + '?\n' +
+                        'Overall Grade: ' + (currentScore ?? '(blank)') + ' → ' + target.data.score + '\n' + feedbackNote +
+                        '\n\nThis clicks Update and changes the evaluation visible to this student. Only this student is updated; Auto-Cruise stays paused.')) {
+                        finishOperation(op, 'Published overwrite canceled. No values were filled or saved.');
+                        return;
+                    }
+                    if (!guardTarget(op, target)) return;
+                    evaluationSaveButton(op, 'update');
+                }
                 if (!await executeFill(op, target)) return;
                 expected = expectedFor(target.data);
             }
             if (!guardTarget(op, target)) return;
             if (action === 'fill') { finishOperation(op, 'Values filled only. This is not a verified save.'); return; }
             if (!await delay(250, op) || !guardTarget(op, target)) return;
-            await saveAndVerify(op, target, expected);
+            await saveAndVerify(op, target, expected, action === 'overwrite' ? 'update' : 'draft');
         } catch (error) { if (op) pauseOnError(op, error); else setStatus(error.message, '#d9534f'); }
     }
 
@@ -814,6 +842,7 @@
             pending.pageInstance === PAGE_INSTANCE || navigationType !== 'reload' ||
             Date.now() - pending.createdAt > READBACK_TTL || Date.now() < pending.createdAt ||
             pending.ctx !== getAssignmentContextKey() || pending.revision !== getDatabaseRevision() ||
+            (pending.saveAction === 'update' && pending.mode !== 'manual') ||
             pending.target?.url !== window.location.href) {
             stopCruise('Pending save was not resumed: reload, context, CSV revision, or time limit did not match.');
             return;
@@ -837,7 +866,7 @@
                         if (data && data.submitted !== false &&
                             Number(data.score) === Number(pending.expected.score) &&
                             (!data.reason?.trim() || normalizeFeedback(data.reason) === normalizeFeedback(pending.expected.reason))) {
-                            markStudentProcessed(pending.target.key, {state: 'verified', verification: 'reload_readback'});
+                            markStudentProcessed(pending.target.key, {state: 'verified', verification: 'reload_readback', saveAction: pending.saveAction || 'draft'});
                         }
                         updateProgress();
                         if (op.mode === 'cruise') {
@@ -849,7 +878,7 @@
                                 const progress = progressSummary();
                                 if (!progress.remaining.length) {
                                     playSuccessChime();
-                                    finishOperation(op, 'CSV complete: ' + progress.verified + ' reload-verified drafts; ' + progress.matched + ' existing evaluations matched; ' + progress.skipped + ' explicitly unsubmitted; ' + progress.outsideCsv + ' outside CSV skipped.');
+                                    finishOperation(op, 'CSV complete: ' + progress.verified + ' reload-verified drafts; ' + progress.updated + ' verified published updates; ' + progress.matched + ' existing evaluations matched; ' + progress.skipped + ' explicitly unsubmitted; ' + progress.outsideCsv + ' outside CSV skipped.');
                                     return;
                                 }
                                 if (!getAutoRewindPref() || op.wraps >= 2) throw new Error('CSV still has unverified students; review the roster/filter.');
@@ -857,7 +886,7 @@
                                 if (!await rewindToFirstStudent(op)) return;
                             }
                             await runCruise(op);
-                        } else { finishOperation(op, 'Draft save verified by reloading and reading the same student.'); }
+                        } else { finishOperation(op, (pending.saveAction === 'update' ? 'Published update' : 'Draft save') + ' verified by reloading and reading the same student.'); }
                         return;
                     }
                 }
@@ -984,7 +1013,7 @@
             maxWidth: 'calc(100vw - 16px)', maxHeight: 'calc(100dvh - 16px)', overflow: 'hidden'});
         Object.assign(hdr.style, {flexShrink: '0', gap: '8px', userSelect: 'none', touchAction: 'none'});
         const title = hdr.querySelector('span');
-        title.textContent = '🎓 Grading Assistant v1.0.8';
+        title.textContent = '🎓 Grading Assistant v1.0.9';
         title.title = 'Brightspace CSV Grade & Feedback Auto-Filler — drag to move';
         Object.assign(title.style, {minWidth: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'});
         Object.assign(minBtn.style, {flexShrink: '0', width: '28px', height: '28px', padding: '0'});
@@ -1082,7 +1111,7 @@
 
             panel.innerHTML = `
                 <div id="bs-panel-hdr" style="background:#006fbf; color:#fff; padding:10px 14px; font-weight:bold; cursor:move; display:flex; justify-content:space-between; align-items:center; border-radius:6px 6px 0 0;">
-                    <span>🎓 Grading Assistant v1.0.8</span>
+                    <span>🎓 Grading Assistant v1.0.9</span>
                     <button id="bs-panel-min" style="background:none; border:none; color:#fff; font-size:16px; cursor:pointer; font-weight:bold;">–</button>
                 </div>
                 <div id="bs-panel-bdy" style="padding:14px;">
@@ -1158,6 +1187,11 @@
                         </button>
                     </div>
 
+                    <button id="bs-btn-overwrite" style="width:100%; padding:9px; background:#a64b00; color:#fff; border:none; border-radius:5px; font-weight:bold; cursor:pointer; font-size:12px; margin-bottom:4px;" title="Confirm, fill this student's CSV values, click Update, then reload to verify. Only for already-published evaluations.">
+                        ✍️ Overwrite Published (Current Student)
+                    </button>
+                    <div style="font-size:11px; color:#854000; margin-bottom:8px;">Updates this student's published grade and feedback after confirmation. Auto-Cruise stays paused.</div>
+
                     <div style="display:flex; gap:6px; margin-bottom:10px;">
                         <button id="bs-btn-rewind-now" style="flex:1; padding:7px; background:#17a2b8; color:#fff; border:none; border-radius:5px; font-weight:bold; cursor:pointer; font-size:11px;" title="Rewind back to first student in roster">
                             ⏮️ To First [Alt+H]
@@ -1171,7 +1205,7 @@
                     </div>
 
                     <div style="font-size:11px; background:#eef5fc; padding:8px; border-radius:5px; margin-bottom:10px; color:#333; line-height:1.4;">
-                        💡 <b>Draft verification</b>: Each save requires a fresh native acknowledgment and page reload readback. Students outside the CSV are skipped separately; identity conflicts pause the run. Completion covers only the imported CSV.
+                        💡 <b>Save verification</b>: Each draft save or manual published update requires a fresh native acknowledgment and page reload readback. Students outside the CSV are skipped separately; identity conflicts pause the run. Completion covers only the imported CSV.
                     </div>
 
                     <hr style="border:0; border-top:1px solid #eee; margin:10px 0;">
@@ -1207,6 +1241,7 @@
             document.getElementById('bs-btn-cruise').addEventListener('click', startCruise);
             for (const [id, action] of [
                 ['bs-btn-fill-now', 'fill'], ['bs-btn-save-now', 'save'], ['bs-btn-fill-save', 'fill-save'],
+                ['bs-btn-overwrite', 'overwrite'],
                 ['bs-btn-rewind-now', 'first'], ['bs-btn-prev-only', 'previous'], ['bs-btn-next-only', 'next']
             ]) document.getElementById(id).addEventListener('click', () => manualAction(action));
             document.getElementById('bs-btn-copy').addEventListener('click', copyCurrentFeedback);

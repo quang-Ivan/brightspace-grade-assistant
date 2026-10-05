@@ -47,7 +47,7 @@ re-identify same student/context + read back score and feedback
 verified -> resume cruise/navigation       mismatch or timeout -> pause
 ```
 
-Only an exact, unique, enabled native **Save Draft** control is an eligible save target. The script does not substitute `Update`, `Publish`, or generic `Save`. Each save includes a page refresh and value check; timing depends on Brightspace's response and the page load.
+For draft saving, only an exact, unique, enabled native **Save Draft** control is eligible. The separate confirmed **Overwrite Published** action requires manual mode and one exact, unique, enabled **Update** control. Neither path substitutes **Publish** or generic **Save**. Each save includes a page refresh and value check; timing depends on Brightspace's response and the page load.
 
 The script changes only the overall grade and overall feedback fields. Rubric criteria, rubric scores, and unrelated editors are out of scope. It operates through page controls and their normal UI events: it does not make its own network requests or call a grading API directly. Brightspace handles server communication, including temporary saving while fields are edited. **Fill Current** means no explicit Save Draft or Publish click. See D2L's [evaluation guide](https://community.d2l.com/brightspace/kb/articles/34714-evaluate-assignment-activities) for the platform's own save behavior.
 
@@ -144,7 +144,9 @@ For a submitted row that needs a new draft save, the sequence is:
 
 The readback is intentionally stronger than “the button was clicked.” A save acknowledgement proves that Brightspace reported that action; only the post-reload readback proves the expected record is present on the same page/context. If readback is unavailable or mismatched, the run pauses and the row remains unresolved.
 
-Save, publish/release, Gradebook synchronization, and student visibility are separate states. A saved draft may later synchronize to a configured Gradebook item, but that behavior is tenant/configuration-dependent and must be checked separately. The userscript never clicks a publish control.
+Save, publish/release, Gradebook synchronization, and student visibility are separate states. A saved draft may later synchronize to a configured Gradebook item, but that behavior is tenant/configuration-dependent and must be checked separately. The userscript never clicks **Publish**. A confirmed manual overwrite does click **Update**, changing an already-published evaluation.
+
+For **Overwrite Published (Current Student)**, manual mode first resolves the CSV identity and requires an enabled Update control. A confirmation names the student and target score before any field changes. After confirmation, the same guarded fill, acknowledgement and reload/readback sequence runs with `saveAction: update`. Successful progress records carry that action and contribute to **Updates verified**, not **Drafts verified**. The operation stops on the same student after readback and never resumes Auto-Cruise. Recovery refuses an Update record in cruise mode. Cancel, identity drift, dialogs, missing/ambiguous controls, failed acknowledgement or mismatched stored values cannot trigger a new automatic update.
 
 ## 5. Traversal, resume, and stop behavior
 

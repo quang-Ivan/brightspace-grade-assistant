@@ -194,8 +194,95 @@ test('fresh CSV fast-skips matching published values without saving, but mismatc
         const run = h.api.startCruise(); await h.advance(500); await run;
         assert.equal(h.saveClicks, 0); assert.equal(h.reloads, 0); assert.equal(h.api.progressSummary().verified, 0);
         assert.equal(h.api.progressSummary().matched, variant === 'matching' ? 1 : 0);
-        assert.match(h.status(), variant === 'matching' ? /1 existing evaluations matched/ : /Published evaluations are not modified/);
+        assert.match(h.status(), variant === 'matching' ? /1 existing evaluations matched/ : /Auto-Cruise does not modify published evaluations/);
     }
+});
+
+test('manual published overwrite confirms the student and bonus score, updates once and verifies after reload', async t => {
+    const h = fixture(t, {score: 5, feedback: '<p>Old feedback</p>'});
+    h.importCSV('student,OrgDefinedId,score,reason\nAlice Smith,001,7,Base 6/6 plus bonus 1.');
+    h.save.textContent = 'Update'; h.grade.setAttribute('max', '6');
+    let confirmation, stored;
+    h.w.confirm = message => { confirmation = message; return true; };
+    h.onSave = () => { stored = {score: h.grade.value, feedback: h.feedbackModel}; h.signal('Evaluation updated'); };
+    const run = h.api.manualAction('overwrite'); await h.advance(1000); await run;
+    assert.match(confirmation, /Alice Smith/); assert.match(confirmation, /OrgDefinedId: 001/); assert.match(confirmation, /5 → 7/);
+    assert.match(confirmation, /visible to this student/);
+    assert.equal(h.saveClicks, 1); assert.equal(h.reloads, 1); assert.equal(h.nextClicks, 0);
+    assert.equal(stored.score, '7'); assert.equal(stored.feedback, '<p>Base 6/6 plus bonus 1.</p>');
+    assert.equal(h.rubric.html, '<p>Keep this rubric feedback</p>');
+    assert.equal(h.api.progressSummary().updated, 0);
+    const reloaded = fixture(t, {local: h.local, session: h.session, navigationType: 'reload', ...stored});
+    reloaded.save.textContent = 'Update';
+    const verify = reloaded.api.restorePendingReadback(); await reloaded.advance(1000); await verify;
+    assert.equal(reloaded.api.progressSummary().updated, 1); assert.equal(reloaded.api.progressSummary().verified, 0);
+    assert.equal(reloaded.api.progressSummary().remaining.length, 0);
+    assert.equal(reloaded.api.getProcessedMap()['id:001'].saveAction, 'update');
+    assert.match(reloaded.status(), /Published update verified/);
+    assert.equal(reloaded.saveClicks, 0); assert.equal(reloaded.nextClicks, 0); assert.equal(reloaded.api.operation(), null);
+});
+
+test('canceling manual overwrite leaves the published fields and verification history unchanged', async t => {
+    const h = fixture(t, {score: 40, feedback: '<p>Keep feedback</p>'}); h.importCSV(CSV);
+    h.save.textContent = 'Update'; h.w.confirm = () => false;
+    await h.api.manualAction('overwrite');
+    assert.equal(h.grade.value, '40'); assert.equal(h.feedbackModel, '<p>Keep feedback</p>');
+    assert.equal(h.saveClicks, 0); assert.equal(h.reloads, 0); assert.equal(h.api.progressSummary().updated, 0);
+    assert.match(h.status(), /canceled/);
+});
+
+test('overwrite requires an exact unique enabled Update control and never substitutes Publish or Save Draft', async t => {
+    for (const mode of ['draft', 'publish', 'disabled', 'duplicate', 'dialog', 'unsubmitted', 'outside', 'conflict']) {
+        const h = fixture(t, {score: 40}); h.importCSV(mode === 'unsubmitted' ? CSV.replace('95', '') : CSV);
+        h.save.textContent = mode === 'draft' ? 'Save Draft' : mode === 'publish' ? 'Publish' : 'Update';
+        if (mode === 'disabled') h.save.disabled = true;
+        if (mode === 'duplicate') h.w.document.body.append(h.save.cloneNode(true));
+        if (mode === 'dialog') { const dialog = h.w.document.createElement('div'); dialog.setAttribute('role', 'dialog'); h.w.document.body.append(dialog); }
+        if (mode === 'outside') h.setStudent('Bob Jones', '002', true);
+        if (mode === 'conflict') h.setStudent('Alice Smith', '999');
+        let confirms = 0; h.w.confirm = () => { confirms++; return true; };
+        await h.api.manualAction('overwrite');
+        assert.equal(confirms, 0, mode); assert.equal(h.grade.value, '40', mode);
+        assert.equal(h.saveClicks, 0, mode); assert.equal(h.reloads, 0, mode);
+    }
+});
+
+test('overwrite cannot follow a changed target or Stop after confirmation', async t => {
+    for (const mode of ['during-confirm', 'before-click', 'stop']) {
+        const h = fixture(t, {score: 40}); h.importCSV(CSV); h.save.textContent = 'Update';
+        h.w.confirm = () => { if (mode === 'during-confirm') h.setStudent('Bob Jones', '002', true); return true; };
+        const run = h.api.manualAction('overwrite'); await h.flush();
+        if (mode === 'stop') h.api.stopCruise();
+        if (mode === 'before-click') h.setStudent('Bob Jones', '002', true);
+        await h.advance(1000); await run;
+        assert.equal(h.saveClicks, 0, mode); assert.equal(h.reloads, 0, mode);
+        if (mode === 'during-confirm') assert.equal(h.grade.value, '40');
+    }
+});
+
+test('published overwrite needs a fresh native acknowledgment and persisted reload values', async t => {
+    for (const mode of ['old-ack', 'error', 'no-persistence']) {
+        const h = fixture(t, {score: 40}); h.importCSV(CSV); h.save.textContent = 'Update'; h.w.confirm = () => true;
+        if (mode === 'old-ack') h.signal('Evaluation updated');
+        h.onSave = () => { if (mode !== 'old-ack') h.signal(mode === 'error' ? 'Update failed' : 'Evaluation updated'); };
+        const run = h.api.manualAction('overwrite'); await h.advance(mode === 'old-ack' ? 13000 : 1000); await run;
+        assert.equal(h.saveClicks, 1); assert.equal(h.api.progressSummary().updated, 0);
+        if (mode !== 'no-persistence') { assert.equal(h.reloads, 0); continue; }
+        const reloaded = fixture(t, {local: h.local, session: h.session, navigationType: 'reload', score: 40});
+        reloaded.save.textContent = 'Update';
+        const verify = reloaded.api.restorePendingReadback(); await reloaded.advance(16000); await verify;
+        assert.equal(reloaded.api.progressSummary().updated, 0); assert.equal(reloaded.saveClicks, 0);
+        assert.match(reloaded.status(), /did not match/);
+    }
+});
+
+test('blank CSV feedback is retained during a manual published update', async t => {
+    const h = fixture(t, {feedback: '<p>Keep published feedback</p>'});
+    h.importCSV('student,OrgDefinedId,score,reason\nAlice Smith,001,95,'); h.save.textContent = 'Update';
+    h.w.confirm = message => { assert.match(message, /Keep existing Overall Feedback/); return true; };
+    h.onSave = () => h.signal('Changes saved');
+    const run = h.api.manualAction('overwrite'); await h.advance(1000); await run;
+    assert.equal(h.feedbackModel, '<p>Keep published feedback</p>'); assert.equal(h.saveClicks, 1); assert.equal(h.reloads, 1);
 });
 
 test('real Brightspace header and footer navigation uses the student-labelled button once', async t => {

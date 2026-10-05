@@ -1,5 +1,15 @@
 # Testing & Current Scope
 
+## v1.0.9 manual published overwrite — 2026-10-05
+
+**Overwrite Published (Current Student)** confirms the selected CSV identity, old/new grade and feedback replacement before filling either field. It targets one enabled native Update control, then requires fresh save acknowledgement and full reload readback. Successful updates are counted separately from drafts; the helper stops on the same student. Auto-Cruise and the draft controls retain their published-evaluation guard. Blank feedback remains unchanged and bonus scores are still permitted.
+
+Syntax and all **55** production-core tests passed. New tests cover a confirmed bonus-score overwrite and fresh-document verification, cancellation without field writes, missing/disabled/ambiguous Update, Publish and Save Draft rejection, dialogs, absent/conflicting/unsubmitted CSV identities, target changes, Stop, stale acknowledgement, native error, failed persistence, and blank feedback preservation.
+
+Chrome ran the complete unmodified v1.0.9 userscript in the loopback fixture with fictional data. CSV import and the new button worked; canceling the confirmation left fields blank and made zero server requests. Confirming Alice Smith saved exactly one Update with score 92 and escaped multiline feedback. The fixture server acknowledged and persisted both values. The full page reload reported **Published update verified by reloading and reading the same student**, **Updates verified: 1**, and **Drafts verified: 0**. The student stayed Alice, no other student was updated, and the unrelated rubric note was preserved.
+
+This browser fixture is a local simulation, not a Brightspace service. No real student's evaluation was updated. Live v1.0.9 Update acknowledgement, stored values, Gradebook synchronization and student visibility remain unverified. The browser security policy blocked direct access to the Tampermonkey extension editor, so installation into the existing Chrome copy was not completed by this release run.
+
 ## v1.0.8 bonus points — 2026-10-05
 
 The helper previously rejected scores above the nominal maximum in both the CSV importer and the Overall Grade fill preflight. v1.0.8 accepts those bonus scores without clamping them or changing the native control's maximum. Finite, nonnegative numeric scores remain required; identity, feedback, save acknowledgment and reload verification checks are unchanged.

@@ -1,10 +1,10 @@
 # 📖 Installation & User Guide
 
-**Brightspace (D2L) CSV Grade & Feedback Auto-Filler** is built for TAs with reviewed grades and written feedback in a spreadsheet; instructors can use it too. It puts each entry into the matching student's assignment page, so you do not have to copy it by hand. It does not decide grades for you, grade rubric items, or publish results to students.
+**Brightspace (D2L) CSV Grade & Feedback Auto-Filler** is built for TAs with reviewed grades and written feedback in a spreadsheet; instructors can use it too. It puts each entry into the matching student's assignment page, so you do not have to copy it by hand. It does not decide grades for you or grade rubric items. Auto-Cruise saves drafts; the separate manual overwrite control updates an already-published evaluation after your confirmation.
 
 You install **one small file**, [`brightspace_auto_feedback_injector.user.js`](../brightspace_auto_feedback_injector.user.js), using Violentmonkey or Tampermonkey. You do not need to learn programming, download the whole project, or install Node, npm, or Git.
 
-For a quick overview, see the [project README](../README.md) or [watch the fictional-data demo](https://quang-Ivan.github.io/brightspace-grade-assistant/#demo). This guide walks through installing v1.0.8, preparing a CSV, and using the helper one student at a time.
+For a quick overview, see the [project README](../README.md) or [watch the fictional-data demo](https://quang-Ivan.github.io/brightspace-grade-assistant/#demo). This guide walks through installing v1.0.9, preparing a CSV, and using the helper one student at a time.
 
 ## Before you start: is this the right tool for your task?
 
@@ -15,7 +15,7 @@ Look at the buttons on Brightspace's own evaluation page, outside the helper pan
 | What you see | What it means for this version |
 | --- | --- |
 | **Save Draft** | The helper can attempt to enter and save an evaluation for later review. Verify one genuine, unpublished submission before starting a batch. |
-| **Update** | This evaluation is already published. The helper does **not** click Update. It can skip the entry if its grade and the feedback supplied in your file already match; otherwise it pauses. |
+| **Update** | This evaluation is already published. Auto-Cruise skips matching values or pauses. **Overwrite Published (Current Student)** can apply a reviewed CSV change after confirmation, then refresh and verify it. |
 | Neither button, or a different page layout | Do not start a batch. First make sure you opened an individual student's assignment evaluation. |
 
 Do not retract a published evaluation or put an invented grade on an unsubmitted student's record just to try the script. A real unpublished submission that you are ready to grade, or an approved test assignment, is the appropriate first-save example.
@@ -51,7 +51,7 @@ You should now see your chosen extension in Chrome's extensions list. You can us
 2. Copy the entire file, from `// ==UserScript==` through the last line.
 3. Open your userscript manager's dashboard. In Violentmonkey, use **+ → Create a new script**; in Tampermonkey, choose **Create a new script**.
 4. Replace the editor's example text with the code you copied. Use Ctrl+A / Ctrl+V on Windows, or Command+A / Command+V on a Mac.
-5. Save in the editor. Confirm **Brightspace (D2L) CSV Grade & Feedback Auto-Filler**, version **1.0.8**, is enabled.
+5. Save in the editor. Confirm **Brightspace (D2L) CSV Grade & Feedback Auto-Filler**, version **1.0.9**, is enabled.
 6. Disable older copies, then refresh Brightspace.
 
 Neither method requires downloading the whole repository or installing developer tools.
@@ -62,7 +62,7 @@ Neither method requires downloading the whole repository or installing developer
 2. Open the course, then **Assignments**, then the assignment you intend to grade.
 3. Click one student's name or **Go to Evaluation**.
 4. Check that you can see that student's name, **Overall Grade**, and **Overall Feedback**.
-5. Refresh the page. The helper panel should show **Grading Assistant v1.0.8**. Click **+** if it is minimized, then check that it shows the same student's name.
+5. Refresh the page. The helper panel should show **Grading Assistant v1.0.9**. Click **+** if it is minimized, then check that it shows the same student's name.
 
 The class submission list is not the individual evaluation page. If the panel says **No student identified**, do not import a file or start filling there; open a student's evaluation first. Likewise, import on the evaluation page where you will work, not on the course home or Grades page.
 
@@ -118,6 +118,15 @@ If there is no confirmation, an error, or a mismatch after refreshing, do not ke
 
 If you filled incorrect values and want to discard them, stop the helper and use Brightspace's own cancel/back workflow, reading any confirmation carefully. Do not click Update or Publish. Check the student's saved record afterward; the helper has no undo button for server-side changes.
 
+### Manually overwrite an already-published evaluation
+
+1. Import the correct CSV, open the intended student's evaluation, and review the name, score and feedback preview.
+2. Click **Overwrite Published (Current Student)**. The confirmation shows the student, old and new scores, and whether feedback will be replaced. **Cancel** leaves both fields unchanged.
+3. Confirm only when the change is ready for the student to see. The helper fills this row's score and any nonblank CSV feedback, clicks the native **Update** button once, waits for a fresh acknowledgement, and refreshes the same page. Blank CSV feedback preserves existing feedback.
+4. Wait for **Published update verified by reloading and reading the same student.** The **Updates verified** count increases. Auto-Cruise stays paused and the helper does not move to another student. Use Next or resume Auto-Cruise yourself afterward.
+
+This control requires a submitted CSV row and exactly one enabled Update button. It does not use Publish for an unpublished evaluation. If the update is not acknowledged or the refreshed values differ, inspect the saved record before retrying; a request may already have reached Brightspace.
+
 ## 7. Process the remaining students
 
 Once the one-student save works on your assignment:
@@ -133,6 +142,7 @@ The progress labels have different meanings:
 | Label | Meaning |
 | --- | --- |
 | Drafts verified | The helper saved a draft, refreshed, and found the expected values again. |
+| Updates verified | A confirmed manual overwrite updated a published evaluation and the refreshed values matched. |
 | Existing matched | The existing values matched your file, so the helper skipped them without a new save. |
 | Unsubmitted | A named CSV row had an explicitly empty score; the helper did not enter a grade or save that evaluation. |
 | Outside CSV | The current roster student matched neither a supported CSV ID nor a CSV name; the helper did not enter a grade or save that evaluation. This count is separate from unsubmitted and is not part of CSV completion. |
@@ -144,12 +154,12 @@ Completion refers to all intended imported CSV rows, not proof that every studen
 | What you see | What to do |
 | --- | --- |
 | No helper panel | Check that Tampermonkey and this script are enabled, Chrome permits user scripts, and Tampermonkey has access to your Brightspace site. Refresh an individual assignment evaluation page. |
-| Panel covers page content | Click **–** or press **Alt+M** to minimize it, or drag its blue title bar to another position. Scroll inside the panel to reach controls in a short window. If the title is off screen, update to v1.0.8 and refresh when your current work can safely reload. |
+| Panel covers page content | Click **–** or press **Alt+M** to minimize it, or drag its blue title bar to another position. Scroll inside the panel to reach controls in a short window. If the title is off screen, update to v1.0.9 and refresh when your current work can safely reload. |
 | No student identified | Open one student's evaluation, not the class list, course home, or Grades page. |
 | No matching CSV row | If neither the displayed name nor a supported page ID matches a CSV row, Auto-Cruise records **Outside CSV**, skips the page without filling or saving, and continues. Review that count afterward; it is not unsubmitted or graded. If the name matches a row but the exposed ID conflicts, or identity is ambiguous, the helper pauses. Do not rename a different student's row to force a match. |
 | Duplicate identity or name is not unique | Check for repeated rows or two students with the same name. Resolve the identity issue using the official roster; do not let the helper guess. |
 | Invalid score or column error | Keep one grade column. Use a number such as `7.5`, not `7/8`, `90%`, `N/A`, or a formula error. Save as comma-delimited CSV and import again. |
-| An Update action is present | The evaluation is already published and cannot be saved as a draft by this version. A difference from your file needs separate review, not another press of Start. |
+| An Update action is present | The evaluation is already published. Review the CSV preview and use **Overwrite Published (Current Student)** if you intend to replace its values. Auto-Cruise does not perform this overwrite. |
 | No fresh native save acknowledgment | Brightspace did not give a confirmation this script recognizes. A save may still have happened; inspect the record before retrying. |
 | A dialog requires your review | Read Brightspace's dialog yourself. The helper does not click through discard, publish, or other confirmation dialogs. |
 | More than one grade/feedback control, or navigation failed | Stop. This page layout may not be supported. Report the error and browser/script versions without including student data. |

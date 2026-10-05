@@ -51,7 +51,7 @@ Load this CSV in the helper, not Brightspace's Grades Import tool.
 
 ## 💾 Saving and publishing
 
-The helper uses **Save Draft**, waits for Brightspace's confirmation, refreshes, and checks the same student's values before continuing. It does not click **Publish** or **Update**. Already-published evaluations are skipped only when the supplied values match; otherwise the helper pauses for review. Confirmation dialogs are left for you to read.
+Auto-Cruise uses **Save Draft**, waits for Brightspace's confirmation, refreshes, and checks the same student's values before continuing. Already-published evaluations are skipped only when the supplied values match; otherwise Auto-Cruise pauses. For a reviewed change, click **Overwrite Published (Current Student)** and confirm the student and score. This fills the CSV values, clicks **Update**, and verifies after refresh, without advancing or resuming Auto-Cruise. Blank CSV feedback is preserved. The helper never clicks **Publish** or automatically accepts native confirmation dialogs.
 
 ## 🔒 Privacy
 
@@ -66,7 +66,7 @@ Imported rows, progress, and the current CSV revision's **Outside CSV** count st
 - [Source code and documentation](https://github.com/quang-Ivan/brightspace-grade-assistant)
 - [Testing details](https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/LOCAL_VALIDATION.md)
 
-Designed for the English-language Consistent Evaluation interface. v1.0.8 permits bonus scores above the nominal maximum in CSV import and field filling. Syntax and all 49 regression tests pass, including filling 7 with a maximum of 6. A fresh Brightspace homepage loaded the installed v1.0.8 script. The v1.0.7 panel repair and v1.0.6 feedback-notification repair are retained. The complete Save Draft and refresh path has simulation coverage; live saving of an over-maximum score remains unverified. See [the local validation notes](https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/LOCAL_VALIDATION.md) for details. The video records v1.0.5 field filling.
+Designed for the English-language Consistent Evaluation interface. v1.0.9 adds **Overwrite Published (Current Student)**: confirm the student and score, fill the CSV values, click the native Update control once, then reload and verify the same student. Auto-Cruise still pauses on published mismatches. Bonus scores above the nominal maximum remain supported. Syntax and all **55** production-core regression tests pass. Chrome simulation verified a confirmed Update, server-stored score and multiline feedback, reload readback, and no automatic advancement. This is simulation evidence; live v1.0.9 Update acceptance remains unverified. The video records v1.0.5 field filling. See [validation details](https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/LOCAL_VALIDATION.md).
 
 ## ❓ Can I bulk enter assignment feedback as a TA?
 

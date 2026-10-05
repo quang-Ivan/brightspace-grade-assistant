@@ -168,6 +168,7 @@
         if (state.mode === 'missing-save' || state.mode === 'published') document.getElementById('save-draft')?.remove();
         if (state.mode === 'published') {
           const update = document.createElement('button'); update.id = 'published-update'; update.type = 'button'; update.textContent = 'Update';
+          update.addEventListener('click', () => saveEvaluation('update'));
           document.getElementById('fixture-actions').append(update);
         }
         if (state.mode === 'multi-feedback') {
@@ -192,18 +193,20 @@
         const id = query().get('student'); const found = state.students.findIndex(student => student.OrgDefinedId === id);
         if (found >= 0) { state.index = found; renderStudent(); }
       });
-      document.getElementById('save-draft')?.addEventListener('click', async () => {
+      async function saveEvaluation(saveAction = 'draft') {
         clearNotices();
         const student = current();
         const payload = {student: student.student, OrgDefinedId: student.OrgDefinedId, score: grade.value, feedbackHtml: state.feedbackHtml, mode: state.mode};
         try {
+          payload.saveAction = saveAction;
           const response = await fetch('/api/drafts', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(payload)});
           const result = await response.json();
-          if (result.acknowledged) notice('Draft saved');
+          if (result.acknowledged) notice(saveAction === 'update' ? 'Evaluation updated' : 'Draft saved');
           else if (!response.ok) notice('Save rejected: ' + (result.error || 'unknown fixture error'), 'alert');
           else notice('Save request sent; native acknowledgment withheld.');
         } catch (error) { notice('Save failed: ' + error.message, 'alert'); }
-      });
+      }
+      document.getElementById('save-draft')?.addEventListener('click', () => saveEvaluation());
 
       async function bootstrap() {
         const response = await fetch('/api/roster', {cache: 'no-store'});
