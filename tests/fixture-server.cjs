@@ -141,7 +141,9 @@ const server = http.createServer((req, res) => {
     if (req.method === 'POST' && url.pathname === '/api/drafts') return handleSave(req, res, url);
     if (req.method !== 'GET') return text(res, 405, 'Method not allowed.');
     if (url.pathname === '/roster.csv') return text(res, 200, fs.readFileSync(rosterPath, 'utf8'), 'text/csv; charset=utf-8');
-    if (url.pathname === '/userscript.js') return text(res, 200, fs.readFileSync(userscriptPath, 'utf8'), 'application/javascript; charset=utf-8');
+    if (url.pathname === '/userscript.js' || url.pathname === '/brightspace_auto_feedback_injector.user.js') {
+        return text(res, 200, fs.readFileSync(userscriptPath, 'utf8'), 'application/javascript; charset=utf-8');
+    }
     if (url.pathname === '/' || url.pathname.startsWith('/d2l/le/activities/iterator/1')) {
         return text(res, 200, fs.readFileSync(htmlPath, 'utf8'), 'text/html; charset=utf-8');
     }

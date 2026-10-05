@@ -1,7 +1,7 @@
 # 🎓 Brightspace (D2L) CSV Grade & Feedback Auto-Filler
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.0.6-brightgreen.svg)](brightspace_auto_feedback_injector.user.js)
+[![Version](https://img.shields.io/badge/Version-1.0.7-brightgreen.svg)](brightspace_auto_feedback_injector.user.js)
 [![Userscript](https://img.shields.io/badge/Userscript-Violentmonkey%20%7C%20Tampermonkey-green.svg)](brightspace_auto_feedback_injector.user.js)
 [![Privacy: No Tracking](https://img.shields.io/badge/Privacy-No%20Tracking-brightgreen.svg)](#-privacy--local-execution)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-orange.svg)](CONTRIBUTING.md)
@@ -42,13 +42,13 @@ Install one browser extension to run userscripts:
 
 Open the [**Greasy Fork listing**](https://greasyfork.org/en/scripts/595051-brightspace-d2l-csv-grade-feedback-auto-filler), click **Install this script**, then confirm **Install** in your extension. Your userscript manager can check Greasy Fork for future updates.
 
-Alternatively, use the [v1.0.6 source file](brightspace_auto_feedback_injector.user.js) and the [manual installation steps](docs/USER_GUIDE.md#2-install-this-script). Keep only one copy of the helper enabled.
+Alternatively, use the [v1.0.7 source file](brightspace_auto_feedback_injector.user.js) and the [manual installation steps](docs/USER_GUIDE.md#2-install-this-script). Keep only one copy of the helper enabled.
 
 ### Step 3: Grade in Brightspace!
 
 1. Log into your university's Brightspace as a TA or instructor with assignment-grading permission.
 2. Go to your course ➔ **Assignments** ➔ Click on any student submission to enter **Consistent Evaluation**.
-3. The blue **🎓 Brightspace CSV Grade & Feedback Auto-Filler** panel appears in the bottom-right corner!
+3. Find the blue **🎓 Grading Assistant** panel. If it is minimized, click **+** to expand it. Drag its title bar to move it; **–** or **Alt+M** minimizes it again.
 4. Click **📁 Load Scores & Feedback CSV** and select your CSV file.
 5. Check the student and preview. On your first run, try **Fill Current → Save Draft** on one unpublished submission and check the result after the page refreshes.
 6. Click **🚀 Start Full Class Auto-Cruise** (or press <kbd>Alt</kbd> + <kbd>A</kbd>). Use **Emergency Stop** whenever you need to pause.
@@ -85,6 +85,7 @@ The helper enters grades through the **assignment evaluation page**, not the Gra
 
 ## 🌟 Features at a Glance
 
+- 🪟 **Move or Minimize the Panel**: The title bar stays on screen, and panel contents scroll in short windows. Drag the title bar to move it; use **– / +** or **Alt+M** to toggle it. Position and the minimized preference survive refreshes. Pages without an identified assignment start minimized.
 - 🔄 **Class Traversal & Progress**: Optionally rewinds to the first student, then moves through a bounded Brightspace roster while tracking your imported rows. Partial CSVs are supported; roster pages with no matching CSV identity are tracked as **Outside CSV** rather than graded or counted as unsubmitted.
 - 🎯 **Focused Form Filling**: Fills only Overall Grade and Overall Feedback, leaving individual rubric scores and unrelated editors alone.
 - 📝 **Written Feedback with Line Breaks**: Copies ordinary text from your CSV, including multiline comments. No HTML formatting is required.
@@ -257,7 +258,7 @@ Your CSV, progress, and the **Outside CSV** count are stored under the school's 
 
 ## ✅ Testing & Current Scope
 
-v1.0.6 fixes a native feedback-change notification defect that could save the score while leaving feedback empty, then pause Auto-Cruise at reload verification. All 47 production-core regression tests pass. The fix was also checked against the currently loaded native Brightspace components without connecting test content to a real evaluation. The complete **Save Draft → refresh → verify** path has been exercised in simulation; a real save with this version remains unverified. See the [test results](docs/LOCAL_VALIDATION.md) for details. The demo records v1.0.5 field filling only.
+v1.0.7 fixes a floating panel that could extend above the window and make its move/minimize controls unreachable. Chrome checks cover short and narrow windows, dragging to viewport edges, minimizing, and restoring position after refresh. The installed script was also checked on a real Brightspace homepage. Syntax and all 47 production-core regression tests pass. The prior v1.0.6 feedback-notification repair is retained; the complete **Save Draft → refresh → verify** path has simulation coverage, while a real save with v1.0.7 remains unverified. See the [test results](docs/LOCAL_VALIDATION.md) for details. The demo records v1.0.5 field filling only.
 
 ---
 

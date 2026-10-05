@@ -1,5 +1,15 @@
 # Testing & Current Scope
 
+## v1.0.7 floating panel repair — 2026-10-05
+
+The previous panel was fixed to the bottom-right corner without a height limit. When its content exceeded the viewport height, its title, drag handle and minimize button extended above the visible page. Dragging also had no viewport boundaries.
+
+v1.0.7 keeps the title outside a scrolling content area, limits the panel to the viewport, and clamps its position after dragging, resizing or content changes. The compact minimized panel, drag position and minimized preference are retained across refreshes. Pages without an identified assignment initially minimize the panel.
+
+Syntax and all **47** production-core regression tests passed. In Chrome's loopback fixture, an **800 × 420** viewport kept the panel within an 8-pixel margin: its height was 404 pixels, and the content scrolled independently. At **320 × 360**, the panel fit within 304 × 344 pixels and its title remained visible. Actual pointer drags to both viewport corners stayed in bounds. Minimizing reduced the fixture panel to 260 × 62 pixels; a refresh restored its minimized state and position. **Alt+M** also minimized the installed v1.0.7 panel.
+
+After updating Tampermonkey, a real Brightspace homepage loaded **Grading Assistant v1.0.7** minimized by default. Expanding and minimizing both worked, and the expanded panel fit the live viewport. This repair performed no grade entry or LMS save; the local fixture recorded **zero saves**. These UI checks do not establish a new live Save Draft acceptance result. The existing demonstration still shows v1.0.5 field filling.
+
 ## v1.0.6 feedback notification repair — 2026-09-14
 
 A live v1.0.5 Auto-Cruise run stopped at reload verification: the score was present but the expected nonempty feedback was absent. Inspection of the currently loaded native Brightspace component identified the cause. Its blur handler compares `editor.html` with the panel's `_feedbackText` (the last-notified value) and only emits `d2l-consistent-eval-feedback-edit` when those values differ. The helper's compatibility bridge assigned `_feedbackText` before emitting blur. When the HTML strings matched, it suppressed the native model update even though the editor displayed the text. Saving could therefore persist the score with empty feedback.

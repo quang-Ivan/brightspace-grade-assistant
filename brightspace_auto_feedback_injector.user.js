@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Brightspace (D2L) CSV Grade & Feedback Auto-Filler
 // @namespace    https://github.com/quang-Ivan/brightspace-grade-assistant
-// @version      1.0.6
+// @version      1.0.7
 // @description  A time-saving tool for TAs: fill Brightspace assignment grades and personalized feedback from CSV. Free, open-source, and no third-party uploads.
 // @author       quang-Ivan
 // @license      MIT
@@ -980,6 +980,91 @@
         }).catch(() => { if (token === activeRunToken) setStatus('Clipboard permission denied.', '#d9534f'); });
     }
 
+    function setupFloatingPanel(panel) {
+        const hdr = panel.querySelector('#bs-panel-hdr');
+        const minBtn = panel.querySelector('#bs-panel-min');
+        const bdy = panel.querySelector('#bs-panel-bdy');
+        const margin = 8;
+        const positionKey = 'd2l_helper_panel_position';
+        const collapsedKey = 'd2l_helper_panel_collapsed';
+        let collapsed = !getAssignmentContextKey() || getPreference(collapsedKey, false);
+        let drag = null;
+
+        Object.assign(panel.style, {display: 'flex', flexDirection: 'column', boxSizing: 'border-box',
+            maxWidth: 'calc(100vw - 16px)', maxHeight: 'calc(100dvh - 16px)', overflow: 'hidden'});
+        Object.assign(hdr.style, {flexShrink: '0', gap: '8px', userSelect: 'none', touchAction: 'none'});
+        const title = hdr.querySelector('span');
+        title.textContent = '🎓 Grading Assistant v1.0.7';
+        title.title = 'Brightspace CSV Grade & Feedback Auto-Filler — drag to move';
+        Object.assign(title.style, {minWidth: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'});
+        Object.assign(minBtn.style, {flexShrink: '0', width: '28px', height: '28px', padding: '0'});
+        minBtn.type = 'button';
+        minBtn.setAttribute('aria-controls', bdy.id);
+        Object.assign(bdy.style, {minHeight: '0', overflowY: 'auto', overscrollBehavior: 'contain'});
+
+        function clampPosition(x, y) {
+            const rect = panel.getBoundingClientRect();
+            const maxX = Math.max(margin, window.innerWidth - rect.width - margin);
+            const maxY = Math.max(margin, window.innerHeight - rect.height - margin);
+            panel.style.left = Math.max(margin, Math.min(maxX, x ?? rect.left)) + 'px';
+            panel.style.top = Math.max(margin, Math.min(maxY, y ?? rect.top)) + 'px';
+            panel.style.right = 'auto';
+            panel.style.bottom = 'auto';
+        }
+        function rememberPosition() {
+            const rect = panel.getBoundingClientRect();
+            try { localStorage.setItem(positionKey, JSON.stringify({x: rect.left, y: rect.top})); } catch (_) {}
+        }
+        function renderCollapse() {
+            panel.style.width = collapsed ? '260px' : '380px';
+            bdy.style.display = collapsed ? 'none' : 'block';
+            panel.dataset.collapsed = String(collapsed);
+            minBtn.textContent = collapsed ? '+' : '–';
+            minBtn.title = collapsed ? 'Expand panel [Alt+M]' : 'Minimize panel [Alt+M]';
+            minBtn.setAttribute('aria-label', collapsed ? 'Expand grading assistant' : 'Minimize grading assistant');
+            minBtn.setAttribute('aria-expanded', String(!collapsed));
+            clampPosition();
+        }
+        function toggleCollapse() {
+            collapsed = !collapsed;
+            renderCollapse();
+            try { localStorage.setItem(collapsedKey, String(collapsed)); } catch (_) {}
+            rememberPosition();
+        }
+        renderCollapse();
+        try {
+            const saved = JSON.parse(localStorage.getItem(positionKey));
+            if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) clampPosition(saved.x, saved.y);
+        } catch (_) {}
+
+        hdr.addEventListener('pointerdown', event => {
+            if (event.button !== 0 || event.target.closest('button')) return;
+            const rect = panel.getBoundingClientRect();
+            drag = {id: event.pointerId, x: event.clientX, y: event.clientY, left: rect.left, top: rect.top};
+            hdr.setPointerCapture?.(event.pointerId);
+            event.preventDefault();
+        });
+        document.addEventListener('pointermove', event => {
+            if (!drag || event.pointerId !== drag.id) return;
+            clampPosition(drag.left + event.clientX - drag.x, drag.top + event.clientY - drag.y);
+        });
+        function finishDrag() {
+            if (!drag) return;
+            drag = null;
+            rememberPosition();
+        }
+        document.addEventListener('pointerup', finishDrag);
+        document.addEventListener('pointercancel', finishDrag);
+        hdr.addEventListener('lostpointercapture', finishDrag);
+        window.addEventListener('blur', finishDrag);
+        minBtn.addEventListener('click', toggleCollapse);
+        window.addEventListener('keydown', event => {
+            if (event.altKey && event.code === 'KeyM') { event.preventDefault(); toggleCollapse(); }
+        });
+        window.addEventListener('resize', () => clampPosition());
+        if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => clampPosition()).observe(panel);
+    }
+
     // Floating Interactive UI Control Panel (100% English)
     if (IS_TOP) {
         function buildUI() {
@@ -1007,7 +1092,7 @@
 
             panel.innerHTML = `
                 <div id="bs-panel-hdr" style="background:#006fbf; color:#fff; padding:10px 14px; font-weight:bold; cursor:move; display:flex; justify-content:space-between; align-items:center; border-radius:6px 6px 0 0;">
-                    <span>🎓 Brightspace CSV Grade & Feedback Auto-Filler v1.0.6</span>
+                    <span>🎓 Grading Assistant v1.0.7</span>
                     <button id="bs-panel-min" style="background:none; border:none; color:#fff; font-size:16px; cursor:pointer; font-weight:bold;">–</button>
                 </div>
                 <div id="bs-panel-bdy" style="padding:14px;">
@@ -1111,30 +1196,7 @@
 
             document.body.appendChild(panel);
 
-            // Dragging
-            const hdr = document.getElementById('bs-panel-hdr');
-            let dragging = false, sX, sY, pX, pY;
-            hdr.addEventListener('mousedown', (e) => {
-                if (e.target.id === 'bs-panel-min') return;
-                dragging = true;
-                sX = e.clientX; sY = e.clientY;
-                pX = panel.offsetLeft; pY = panel.offsetTop;
-            });
-            document.addEventListener('mousemove', (e) => {
-                if (!dragging) return;
-                panel.style.left = (pX + e.clientX - sX) + 'px';
-                panel.style.top = (pY + e.clientY - sY) + 'px';
-                panel.style.right = 'auto';
-            });
-            document.addEventListener('mouseup', () => { dragging = false; });
-
-            // Toggle collapse
-            const minBtn = document.getElementById('bs-panel-min');
-            const bdy = document.getElementById('bs-panel-bdy');
-            minBtn.addEventListener('click', () => {
-                bdy.style.display = (bdy.style.display === 'none') ? 'block' : 'none';
-                minBtn.textContent = (bdy.style.display === 'none') ? '+' : '–';
-            });
+            setupFloatingPanel(panel);
 
             document.getElementById('bs-chk-skip').addEventListener('change', event => {
                 stopCruise('Skip preference changed; automation paused.');
