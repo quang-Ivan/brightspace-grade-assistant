@@ -35,7 +35,7 @@
     },
     "description": "A free userscript for teaching assistants to fill reviewed assignment grades and personalized feedback from CSV into Brightspace.",
     "url": "https://quang-Ivan.github.io/brightspace-grade-assistant/",
-    "softwareVersion": "1.0.9",
+    "softwareVersion": "1.0.10",
     "license": "https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/LICENSE",
     "author": {
       "@type": "Person",
@@ -283,7 +283,7 @@
   <header>
     <div class="container">
       <div class="badge-bar" style="margin-bottom:16px;">
-        <span class="badge">🚀 v1.0.9</span>
+        <span class="badge">🚀 v1.0.10</span>
         <span class="badge">🔒 No Tracking or Third-Party Uploads</span>
         <span class="badge">⚖️ MIT Open Source</span>
       </div>
@@ -311,7 +311,7 @@
         </a>
       </div>
       <p class="install-status">New to userscripts? Follow the <a href="#install">installation steps below</a>.</p>
-      <p class="install-status"><strong>New in v1.0.9:</strong> Use <strong>Overwrite Published (Current Student)</strong> to confirm a CSV change, update the current published evaluation, and verify it after refresh. Auto-Cruise stays paused. Bonus scores above the nominal maximum remain supported.</p>
+      <p class="install-status"><strong>New in v1.0.10:</strong> Auto-Cruise can resume after Fill Current and a manual native Update. It first refreshes to verify stored values, then continues without submitting another Update. The confirmed Overwrite Published button and bonus scores remain supported.</p>
     </div>
   </header>
 
@@ -573,10 +573,10 @@
       </div>
       <div class="faq-item">
         <div class="faq-question">How can I stop the helper panel from covering page content?</div>
-        <div class="faq-answer">Click <strong>–</strong> or press <code>Alt + M</code> to minimize it, and click <strong>+</strong> to expand it. Drag the blue title bar to move it. In short windows, scroll inside the panel to reach its remaining controls. If the title is off screen in an older version, update to v1.0.9 and refresh when your current work can safely reload.</div>
+        <div class="faq-answer">Click <strong>–</strong> or press <code>Alt + M</code> to minimize it, and click <strong>+</strong> to expand it. Drag the blue title bar to move it. In short windows, scroll inside the panel to reach its remaining controls. If the title is off screen in an older version, update to v1.0.10 and refresh when your current work can safely reload.</div>
       </div>
       <p style="margin-top:24px; color:var(--text-muted); font-size:14px;">
-        <strong>Testing:</strong> v1.0.9 adds Overwrite Published (Current Student): confirm the student and score, fill the CSV values, click the native Update control once, then reload and verify the same student. Auto-Cruise still pauses on published mismatches. Bonus scores above the nominal maximum remain supported. Syntax and all 55 production-core regression tests pass. Chrome simulation verified a confirmed Update, server-stored score and multiline feedback, reload readback, and no automatic advancement. This is simulation evidence; live v1.0.9 Update acceptance remains unverified. The video records v1.0.5 field filling.
+        <strong>Testing:</strong> v1.0.10 fixes restarting Auto-Cruise after Fill Current → native Update. When this page still carries a local edit marker, the helper reloads and verifies the stored values before advancing, without sending another Update. A merely visible, unsaved fill cannot become a completed match. The confirmed Overwrite Published (Current Student) control also supports restarting Auto-Cruise after its verification. Keep Skip matching existing evaluations enabled; turn off Cover entire class if you want to continue from the current student instead of rewinding. Syntax and all 57 production-core tests pass. A Chrome simulation completed all six fictional rows after a native Update with zero additional save requests. Live Brightspace acceptance remains unverified.
         <a href="https://github.com/quang-Ivan/brightspace-grade-assistant/blob/main/docs/LOCAL_VALIDATION.md">See the testing details</a>.
       </p>
     </div>

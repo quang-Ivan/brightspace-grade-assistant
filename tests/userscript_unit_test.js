@@ -183,7 +183,7 @@ test('published/ambiguous/negative save labels cannot be selected as Save Draft'
     assert.equal(h.saveClicks, 0);
 });
 
-test('fresh CSV fast-skips matching published values without saving, but mismatches and dirty feedback pause', async t => {
+test('fresh CSV fast-skips matching published values; dirty matches reload and mismatches pause', async t => {
     for (const variant of ['matching', 'mismatch', 'dirty', 'filled-dirty-reset']) {
         const h = fixture(t, {score: 95, feedback: variant === 'mismatch' ? '<p>Old feedback</p>' : '<p>Good work</p>'});
         h.importCSV(CSV); h.save.textContent = 'Update'; h.editor.isDirty = variant === 'dirty';
@@ -192,10 +192,43 @@ test('fresh CSV fast-skips matching published values without saving, but mismatc
             await h.api.manualAction('fill'); h.editor.isDirty = false;
         }
         const run = h.api.startCruise(); await h.advance(500); await run;
-        assert.equal(h.saveClicks, 0); assert.equal(h.reloads, 0); assert.equal(h.api.progressSummary().verified, 0);
+        assert.equal(h.saveClicks, 0); assert.equal(h.reloads, ['dirty', 'filled-dirty-reset'].includes(variant) ? 1 : 0); assert.equal(h.api.progressSummary().verified, 0);
         assert.equal(h.api.progressSummary().matched, variant === 'matching' ? 1 : 0);
-        assert.match(h.status(), variant === 'matching' ? /1 existing evaluations matched/ : /Auto-Cruise does not modify published evaluations/);
+        assert.match(h.status(), variant === 'matching' ? /1 existing evaluations matched/ :
+            ['dirty', 'filled-dirty-reset'].includes(variant) ? /Reloading to check whether this published evaluation was saved/ : /Auto-Cruise does not modify published evaluations/);
     }
+});
+
+test('Fill Current then native Update can restart cruise by verifying stored values and moving to the next student', async t => {
+    const h = fixture(t); h.importCSV(CSV + '\nBob Jones,002,,'); h.save.textContent = 'Update';
+    await h.api.manualAction('fill');
+    let stored;
+    h.onSave = () => { stored = {score: h.grade.value, feedback: h.feedbackModel}; h.editor.isDirty = false; h.signal('Evaluation updated'); };
+    h.save.click(); // The user clicks Brightspace's native Update, outside the helper.
+    const run = h.api.startCruise(); await h.advance(1000); await run;
+    assert.equal(h.saveClicks, 1); assert.equal(h.reloads, 1); assert.equal(h.nextClicks, 0);
+    assert.equal(h.api.progressSummary().matched, 0);
+    const reloaded = fixture(t, {local: h.local, session: h.session, navigationType: 'reload', ...stored});
+    reloaded.save.textContent = 'Update';
+    reloaded.onNext = () => { reloaded.setStudent('Bob Jones', '002', true); reloaded.next.disabled = true; };
+    const verify = reloaded.api.restorePendingReadback(); await reloaded.advance(2000); await verify;
+    assert.equal(reloaded.nextClicks, 1); assert.equal(reloaded.saveClicks, 0);
+    assert.equal(reloaded.api.progressSummary().matched, 1); assert.equal(reloaded.api.progressSummary().skipped, 1);
+    assert.equal(reloaded.api.progressSummary().verified, 0); assert.equal(reloaded.api.progressSummary().updated, 0);
+    assert.equal(reloaded.api.getProcessedMap()['id:001'].verification, 'reload_readback');
+    assert.match(reloaded.status(), /CSV complete/);
+});
+
+test('restarting cruise after an unsaved fill cannot turn visible published values into a saved match', async t => {
+    const h = fixture(t, {score: 40, feedback: '<p>Stored old feedback</p>'}); h.importCSV(CSV); h.save.textContent = 'Update';
+    await h.api.manualAction('fill');
+    const run = h.api.startCruise(); await h.advance(1000); await run;
+    assert.equal(h.reloads, 1); assert.equal(h.saveClicks, 0);
+    const reloaded = fixture(t, {local: h.local, session: h.session, navigationType: 'reload', score: 40, feedback: '<p>Stored old feedback</p>'});
+    reloaded.save.textContent = 'Update';
+    const verify = reloaded.api.restorePendingReadback(); await reloaded.advance(16000); await verify;
+    assert.equal(reloaded.nextClicks, 0); assert.equal(reloaded.saveClicks, 0); assert.equal(reloaded.api.progressSummary().matched, 0);
+    assert.match(reloaded.status(), /did not match/);
 });
 
 test('manual published overwrite confirms the student and bonus score, updates once and verifies after reload', async t => {
@@ -220,6 +253,10 @@ test('manual published overwrite confirms the student and bonus score, updates o
     assert.equal(reloaded.api.getProcessedMap()['id:001'].saveAction, 'update');
     assert.match(reloaded.status(), /Published update verified/);
     assert.equal(reloaded.saveClicks, 0); assert.equal(reloaded.nextClicks, 0); assert.equal(reloaded.api.operation(), null);
+    reloaded.onNext = () => { reloaded.setStudent('Bob Jones', '002', true); reloaded.next.disabled = true; };
+    const resumed = reloaded.api.startCruise(); await reloaded.advance(2000); await resumed;
+    assert.equal(reloaded.nextClicks, 1); assert.equal(reloaded.saveClicks, 0); assert.equal(reloaded.reloads, 0);
+    assert.equal(reloaded.api.progressSummary().updated, 1); assert.match(reloaded.status(), /CSV complete/);
 });
 
 test('canceling manual overwrite leaves the published fields and verification history unchanged', async t => {

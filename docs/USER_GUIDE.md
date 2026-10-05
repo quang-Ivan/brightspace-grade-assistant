@@ -4,7 +4,7 @@
 
 You install **one small file**, [`brightspace_auto_feedback_injector.user.js`](../brightspace_auto_feedback_injector.user.js), using Violentmonkey or Tampermonkey. You do not need to learn programming, download the whole project, or install Node, npm, or Git.
 
-For a quick overview, see the [project README](../README.md) or [watch the fictional-data demo](https://quang-Ivan.github.io/brightspace-grade-assistant/#demo). This guide walks through installing v1.0.9, preparing a CSV, and using the helper one student at a time.
+For a quick overview, see the [project README](../README.md) or [watch the fictional-data demo](https://quang-Ivan.github.io/brightspace-grade-assistant/#demo). This guide walks through installing v1.0.10, preparing a CSV, and using the helper one student at a time.
 
 ## Before you start: is this the right tool for your task?
 
@@ -51,7 +51,7 @@ You should now see your chosen extension in Chrome's extensions list. You can us
 2. Copy the entire file, from `// ==UserScript==` through the last line.
 3. Open your userscript manager's dashboard. In Violentmonkey, use **+ → Create a new script**; in Tampermonkey, choose **Create a new script**.
 4. Replace the editor's example text with the code you copied. Use Ctrl+A / Ctrl+V on Windows, or Command+A / Command+V on a Mac.
-5. Save in the editor. Confirm **Brightspace (D2L) CSV Grade & Feedback Auto-Filler**, version **1.0.9**, is enabled.
+5. Save in the editor. Confirm **Brightspace (D2L) CSV Grade & Feedback Auto-Filler**, version **1.0.10**, is enabled.
 6. Disable older copies, then refresh Brightspace.
 
 Neither method requires downloading the whole repository or installing developer tools.
@@ -62,7 +62,7 @@ Neither method requires downloading the whole repository or installing developer
 2. Open the course, then **Assignments**, then the assignment you intend to grade.
 3. Click one student's name or **Go to Evaluation**.
 4. Check that you can see that student's name, **Overall Grade**, and **Overall Feedback**.
-5. Refresh the page. The helper panel should show **Grading Assistant v1.0.9**. Click **+** if it is minimized, then check that it shows the same student's name.
+5. Refresh the page. The helper panel should show **Grading Assistant v1.0.10**. Click **+** if it is minimized, then check that it shows the same student's name.
 
 The class submission list is not the individual evaluation page. If the panel says **No student identified**, do not import a file or start filling there; open a student's evaluation first. Likewise, import on the evaluation page where you will work, not on the course home or Grades page.
 
@@ -123,9 +123,11 @@ If you filled incorrect values and want to discard them, stop the helper and use
 1. Import the correct CSV, open the intended student's evaluation, and review the name, score and feedback preview.
 2. Click **Overwrite Published (Current Student)**. The confirmation shows the student, old and new scores, and whether feedback will be replaced. **Cancel** leaves both fields unchanged.
 3. Confirm only when the change is ready for the student to see. The helper fills this row's score and any nonblank CSV feedback, clicks the native **Update** button once, waits for a fresh acknowledgement, and refreshes the same page. Blank CSV feedback preserves existing feedback.
-4. Wait for **Published update verified by reloading and reading the same student.** The **Updates verified** count increases. Auto-Cruise stays paused and the helper does not move to another student. Use Next or resume Auto-Cruise yourself afterward.
+4. Wait for **Published update verified by reloading and reading the same student.** The **Updates verified** count increases. Auto-Cruise stays paused and the helper does not move to another student. You can click **Start Auto-Cruise** afterward. Keep **Skip matching existing evaluations** checked so the verified current entry is skipped. To continue from here, uncheck **Cover entire class (Auto-rewind to start)**; otherwise Start first rewinds to the beginning of the roster.
 
 This control requires a submitted CSV row and exactly one enabled Update button. It does not use Publish for an unpublished evaluation. If the update is not acknowledged or the refreshed values differ, inspect the saved record before retrying; a request may already have reached Brightspace.
+
+If you use **Fill Current → Brightspace's native Update** instead, v1.0.10 can also resume. Click **Start Auto-Cruise** with **Skip matching existing evaluations** checked. The helper may first refresh the current published page to distinguish saved values from its own unsaved fill. Matching stored values allow it to continue; different stored values pause the run. This check never sends another Update.
 
 ## 7. Process the remaining students
 
@@ -154,7 +156,7 @@ Completion refers to all intended imported CSV rows, not proof that every studen
 | What you see | What to do |
 | --- | --- |
 | No helper panel | Check that Tampermonkey and this script are enabled, Chrome permits user scripts, and Tampermonkey has access to your Brightspace site. Refresh an individual assignment evaluation page. |
-| Panel covers page content | Click **–** or press **Alt+M** to minimize it, or drag its blue title bar to another position. Scroll inside the panel to reach controls in a short window. If the title is off screen, update to v1.0.9 and refresh when your current work can safely reload. |
+| Panel covers page content | Click **–** or press **Alt+M** to minimize it, or drag its blue title bar to another position. Scroll inside the panel to reach controls in a short window. If the title is off screen, update to v1.0.10 and refresh when your current work can safely reload. |
 | No student identified | Open one student's evaluation, not the class list, course home, or Grades page. |
 | No matching CSV row | If neither the displayed name nor a supported page ID matches a CSV row, Auto-Cruise records **Outside CSV**, skips the page without filling or saving, and continues. Review that count afterward; it is not unsubmitted or graded. If the name matches a row but the exposed ID conflicts, or identity is ambiguous, the helper pauses. Do not rename a different student's row to force a match. |
 | Duplicate identity or name is not unique | Check for repeated rows or two students with the same name. Resolve the identity issue using the official roster; do not let the helper guess. |

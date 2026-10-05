@@ -1,5 +1,17 @@
 # Testing & Current Scope
 
+## v1.0.10 resume after native Update — 2026-10-05
+
+The previous helper retained `locallyEditedTarget` after Fill Current even if the user subsequently clicked Brightspace's native Update. Restarting Auto-Cruise therefore refused to treat the matching published fields as saved and paused on its Update guard. This path was reproduced on v1.0.9: one native Update, zero reloads and zero next-student clicks. The confirmed v1.0.9 overwrite button already supported restart after its own reload/readback; its regression test now also checks that restart reaches the next student.
+
+v1.0.10 handles a matching published page with a local/dirty edit marker by refreshing and verifying the stored values. It records an existing match, preserves any already-reconciled verified record, and resumes cruise at the next student only after matching readback. It sends no save or Update during this check. An unsaved fill whose refreshed values differ still pauses and is not recorded as complete. Skip matching must be enabled; Cover entire class retains its rewind behavior.
+
+Syntax and all **57** production-core tests pass. New regressions cover native Update followed by restart, next-student navigation, no duplicate Update, and refusal to accept an unsaved fill as a stored match. Existing cancellation, identity, publication guards and save/reload tests remain passing.
+
+Chrome ran the complete userscript against six fictional rows. Four other scored evaluations were seeded as stored matches. UI actions imported the CSV, filled Alice, clicked the fixture's native Update, then restarted Auto-Cruise. The page refreshed, continued through the remaining roster, and reported **5 existing evaluations matched, 1 explicitly unsubmitted, 0 CSV rows remaining**. The server recorded four setup writes and exactly one manual Update; restarting cruise generated **zero additional save requests**. Zero grades, duplicate displayed names with distinct IDs, multiline feedback and the unrelated rubric note were retained.
+
+This is local simulation evidence. No live grade was changed, and live Brightspace native Update/restart acceptance remains unverified. The existing Chrome installed copy still needs the manager's normal update process; direct extension-editor access was blocked by the browser security policy in the preceding release run.
+
 ## v1.0.9 manual published overwrite — 2026-10-05
 
 **Overwrite Published (Current Student)** confirms the selected CSV identity, old/new grade and feedback replacement before filling either field. It targets one enabled native Update control, then requires fresh save acknowledgement and full reload readback. Successful updates are counted separately from drafts; the helper stops on the same student. Auto-Cruise and the draft controls retain their published-evaluation guard. Blank feedback remains unchanged and bonus scores are still permitted.

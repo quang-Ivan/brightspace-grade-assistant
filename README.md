@@ -1,7 +1,7 @@
 # 🎓 Brightspace (D2L) CSV Grade & Feedback Auto-Filler
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.0.9-brightgreen.svg)](brightspace_auto_feedback_injector.user.js)
+[![Version](https://img.shields.io/badge/Version-1.0.10-brightgreen.svg)](brightspace_auto_feedback_injector.user.js)
 [![Userscript](https://img.shields.io/badge/Userscript-Violentmonkey%20%7C%20Tampermonkey-green.svg)](brightspace_auto_feedback_injector.user.js)
 [![Privacy: No Tracking](https://img.shields.io/badge/Privacy-No%20Tracking-brightgreen.svg)](#-privacy--local-execution)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-orange.svg)](CONTRIBUTING.md)
@@ -42,7 +42,7 @@ Install one browser extension to run userscripts:
 
 Open the [**Greasy Fork listing**](https://greasyfork.org/en/scripts/595051-brightspace-d2l-csv-grade-feedback-auto-filler), click **Install this script**, then confirm **Install** in your extension. Your userscript manager can check Greasy Fork for future updates.
 
-Alternatively, use the [v1.0.9 source file](brightspace_auto_feedback_injector.user.js) and the [manual installation steps](docs/USER_GUIDE.md#2-install-this-script). Keep only one copy of the helper enabled.
+Alternatively, use the [v1.0.10 source file](brightspace_auto_feedback_injector.user.js) and the [manual installation steps](docs/USER_GUIDE.md#2-install-this-script). Keep only one copy of the helper enabled.
 
 ### Step 3: Grade in Brightspace!
 
@@ -260,7 +260,7 @@ Your CSV, progress, and the **Outside CSV** count are stored under the school's 
 
 ## ✅ Testing & Current Scope
 
-v1.0.9 adds **Overwrite Published (Current Student)**: confirm the student and score, fill the CSV values, click the native Update control once, then reload and verify the same student. Auto-Cruise still pauses on published mismatches. Bonus scores above the nominal maximum remain supported. Syntax and all **55** production-core regression tests pass. Chrome simulation verified a confirmed Update, server-stored score and multiline feedback, reload readback, and no automatic advancement. This is simulation evidence; live v1.0.9 Update acceptance remains unverified. The video records v1.0.5 field filling. See the [test results](docs/LOCAL_VALIDATION.md).
+v1.0.10 fixes restarting Auto-Cruise after **Fill Current → native Update**. When this page still carries a local edit marker, the helper reloads and verifies the stored values before advancing, without sending another Update. A merely visible, unsaved fill cannot become a completed match. The confirmed **Overwrite Published (Current Student)** control also supports restarting Auto-Cruise after its verification. Keep **Skip matching existing evaluations** enabled; turn off **Cover entire class** if you want to continue from the current student instead of rewinding. Syntax and all **57** production-core tests pass. A Chrome simulation completed all six fictional rows after a native Update with zero additional save requests. Live Brightspace acceptance remains unverified. See the [test results](docs/LOCAL_VALIDATION.md).
 
 ---
 

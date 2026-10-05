@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Brightspace (D2L) CSV Grade & Feedback Auto-Filler
 // @namespace    https://github.com/quang-Ivan/brightspace-grade-assistant
-// @version      1.0.9
+// @version      1.0.10
 // @description  A time-saving tool for TAs: fill Brightspace assignment grades and personalized feedback from CSV. Free, open-source, and no third-party uploads.
 // @author       quang-Ivan
 // @license      MIT
@@ -579,31 +579,38 @@
         return guardTarget(op, target) && readbackMatches(expected);
     }
 
-    async function saveAndVerify(op, target, expected, saveAction = 'draft') {
-        if (!guardTarget(op, target)) return false;
-        if (!readbackMatches(expected)) throw new Error('Values changed before saving. Paused.');
-        evaluationSaveButton(op, saveAction); // Preflight before creating recovery state or clicking.
-        // Test storage before sending a save; readback cannot safely resume without it.
-        const pending = {schemaVersion: SCHEMA_VERSION, stage: 'waiting_ack', pageInstance: PAGE_INSTANCE,
+    function storePendingReadback(op, target, expected, saveAction, stage) {
+        const pending = {schemaVersion: SCHEMA_VERSION, stage, pageInstance: PAGE_INSTANCE,
             createdAt: Date.now(), ctx: op.ctx, revision: op.revision, mode: op.mode, saveAction,
             wraps: op.wraps, hops: op.hops,
             target: {ctx: target.ctx, url: target.url, name: target.name, orgId: target.orgId, key: target.key}, expected};
         sessionStorage.setItem(PENDING_KEY, JSON.stringify(pending));
-        const previous = new Map(nativeSignals().map(signal => [signal.node, signal.text]));
-        if (!triggerSave(op, target, saveAction)) return false;
-        setStatus((saveAction === 'update' ? 'Update' : 'Save Draft') + ' requested. Waiting for native confirmation...', '#006fbf');
-        if (!await waitForSaveAcknowledgement(op, target, previous, saveAction) || !guardTarget(op, target)) return false;
-        if (!readbackMatches(expected)) throw new Error('Values changed during saving. Completion was not recorded.');
-        pending.stage = 'readback';
-        pending.createdAt = Date.now();
-        sessionStorage.setItem(PENDING_KEY, JSON.stringify(pending));
-        setStatus('Save acknowledged. Reloading this student to verify stored values...', '#006fbf');
+    }
+
+    function reloadAndVerify(op, target, expected, saveAction, message) {
+        if (!guardTarget(op, target)) return false;
+        storePendingReadback(op, target, expected, saveAction, 'readback');
+        setStatus(message, '#006fbf');
         window.location.reload();
         delay(15000, op).then(current => {
             if (current && guardOperation(op)) stopCruise('Page reload did not complete. No verification was recorded.');
         });
         // Do not advance in this document. A new document must perform the readback.
         return 'reload';
+    }
+
+    async function saveAndVerify(op, target, expected, saveAction = 'draft') {
+        if (!guardTarget(op, target)) return false;
+        if (!readbackMatches(expected)) throw new Error('Values changed before saving. Paused.');
+        evaluationSaveButton(op, saveAction); // Preflight before creating recovery state or clicking.
+        // Test storage before sending a save; readback cannot safely resume without it.
+        storePendingReadback(op, target, expected, saveAction, 'waiting_ack');
+        const previous = new Map(nativeSignals().map(signal => [signal.node, signal.text]));
+        if (!triggerSave(op, target, saveAction)) return false;
+        setStatus((saveAction === 'update' ? 'Update' : 'Save Draft') + ' requested. Waiting for native confirmation...', '#006fbf');
+        if (!await waitForSaveAcknowledgement(op, target, previous, saveAction) || !guardTarget(op, target)) return false;
+        if (!readbackMatches(expected)) throw new Error('Values changed during saving. Completion was not recorded.');
+        return reloadAndVerify(op, target, expected, saveAction, 'Save acknowledged. Reloading this student to verify stored values...');
     }
 
     function navigationButton(direction) {
@@ -664,7 +671,7 @@
         if (!record || record.fingerprint !== recordFingerprint(data)) return false;
         return data.submitted === false ? record.state === 'unsubmitted'
             : (record.state === 'verified' && record.verification === 'reload_readback') ||
-                (record.state === 'matched' && record.verification === 'page_readback');
+                (record.state === 'matched' && ['page_readback', 'reload_readback'].includes(record.verification));
     }
 
     function progressSummary() {
@@ -733,6 +740,12 @@
             const editor = data.reason?.trim() ? feedbackControl().editor : null;
             const dirty = (locallyEditedTarget && targetMatches(locallyEditedTarget)) || editor?.isDirty === true ||
                 window.tinymce?.get(editor?._editorId)?.isDirty?.() === true;
+            if (published && dirty) {
+                // A native manual Update does not clear our local fill marker.
+                // Reload to distinguish stored values from a merely visible, unsaved fill.
+                return reloadAndVerify(op, target, expectedFor(data), 'existing',
+                    'Reloading to check whether this published evaluation was saved. No Update is being sent...');
+            }
             if (!dirty && (published || completedRecord(data.key, data))) {
                 if (!completedRecord(data.key, data)) {
                     markStudentProcessed(data.key, {state: 'matched', verification: 'page_readback'});
@@ -865,8 +878,10 @@
                         const data = getStudentDatabase()[pending.target.key];
                         if (data && data.submitted !== false &&
                             Number(data.score) === Number(pending.expected.score) &&
-                            (!data.reason?.trim() || normalizeFeedback(data.reason) === normalizeFeedback(pending.expected.reason))) {
-                            markStudentProcessed(pending.target.key, {state: 'verified', verification: 'reload_readback', saveAction: pending.saveAction || 'draft'});
+                            (!data.reason?.trim() || normalizeFeedback(data.reason) === normalizeFeedback(pending.expected.reason)) &&
+                            (pending.saveAction !== 'existing' || !completedRecord(pending.target.key, data))) {
+                            markStudentProcessed(pending.target.key, {state: pending.saveAction === 'existing' ? 'matched' : 'verified',
+                                verification: 'reload_readback', saveAction: pending.saveAction || 'draft'});
                         }
                         updateProgress();
                         if (op.mode === 'cruise') {
@@ -1013,7 +1028,7 @@
             maxWidth: 'calc(100vw - 16px)', maxHeight: 'calc(100dvh - 16px)', overflow: 'hidden'});
         Object.assign(hdr.style, {flexShrink: '0', gap: '8px', userSelect: 'none', touchAction: 'none'});
         const title = hdr.querySelector('span');
-        title.textContent = '🎓 Grading Assistant v1.0.9';
+        title.textContent = '🎓 Grading Assistant v1.0.10';
         title.title = 'Brightspace CSV Grade & Feedback Auto-Filler — drag to move';
         Object.assign(title.style, {minWidth: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'});
         Object.assign(minBtn.style, {flexShrink: '0', width: '28px', height: '28px', padding: '0'});
@@ -1111,7 +1126,7 @@
 
             panel.innerHTML = `
                 <div id="bs-panel-hdr" style="background:#006fbf; color:#fff; padding:10px 14px; font-weight:bold; cursor:move; display:flex; justify-content:space-between; align-items:center; border-radius:6px 6px 0 0;">
-                    <span>🎓 Grading Assistant v1.0.9</span>
+                    <span>🎓 Grading Assistant v1.0.10</span>
                     <button id="bs-panel-min" style="background:none; border:none; color:#fff; font-size:16px; cursor:pointer; font-weight:bold;">–</button>
                 </div>
                 <div id="bs-panel-bdy" style="padding:14px;">
@@ -1190,7 +1205,7 @@
                     <button id="bs-btn-overwrite" style="width:100%; padding:9px; background:#a64b00; color:#fff; border:none; border-radius:5px; font-weight:bold; cursor:pointer; font-size:12px; margin-bottom:4px;" title="Confirm, fill this student's CSV values, click Update, then reload to verify. Only for already-published evaluations.">
                         ✍️ Overwrite Published (Current Student)
                     </button>
-                    <div style="font-size:11px; color:#854000; margin-bottom:8px;">Updates this student's published grade and feedback after confirmation. Auto-Cruise stays paused.</div>
+                    <div style="font-size:11px; color:#854000; margin-bottom:8px;">Updates this student's published grade and feedback after confirmation. After verification, click Start Auto-Cruise to resume.</div>
 
                     <div style="display:flex; gap:6px; margin-bottom:10px;">
                         <button id="bs-btn-rewind-now" style="flex:1; padding:7px; background:#17a2b8; color:#fff; border:none; border-radius:5px; font-weight:bold; cursor:pointer; font-size:11px;" title="Rewind back to first student in roster">
